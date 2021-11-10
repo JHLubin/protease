@@ -2142,7 +2142,7 @@ def selector_to_pymol(pose, selector, selection_name):
 
 	# Generate command
 	pymol_command = srpmm.calculate(pose)
-	pymol_command.replace('rosetta_sele', selection_name)
+	pymol_command = pymol_command.replace('rosetta_sele', selection_name)
 
 	return pymol_command
 
@@ -2369,6 +2369,42 @@ def apply_res_type_constraints(pose, penalty=0.5):
 	constrained_pose = Pose(pose)
 	FavorNativeResidue(constrained_pose, penalty)
 	return constrained_pose
+
+
+def apply_distance_constraints(pose, residue_1, atom_1, residue_2, atom_2, 
+	distance, sd):
+	"""
+	Adds specified distance constraints to a pose. Uses a harmonic constraint 
+	function with a specifiable standard deviation. Input a pose and two residue 
+	numbers with the correspondig atoms for each residue. If distance is set to 
+	0, will use the current distance.
+
+	The pose is modified and the function has an empty return.
+
+	Example:
+	apply_distance_constraints(pose, 10, 'CA', 20, 'CA', 5, 0.5)
+	"""
+	from pyrosetta.rosetta.core.scoring.constraints import AtomPairConstraint
+	from pyrosetta.rosetta.core.scoring.func import HarmonicFunc
+
+	# Determine atoms to constrain
+	a1 = find_res_atom(pose, residue_1, atom_type=atom_1)
+	a2 = find_res_atom(pose, residue_2, atom_type=atom_2)
+
+	# Adjust distance if current distance is desired
+	if distance == 0:
+		distance = get_distance(a1, a2)
+
+	# Create harmonic score function with specified distance and sd
+	harm_func = HarmonicFunc(distance, sd)
+
+	# Create the constraint
+	distance_constraint = AtomPairConstraint(a1, a2, harm_func)
+
+	# Add the constraint to the pose
+	pose.add_constraint(distance_constraint)
+
+	return
 
 
 def apply_dihedral_constraint(pose, residue, dihedral, angle, sd=5):
