@@ -2,7 +2,7 @@ import argparse
 import joey_utils as ut
 from os.path import join
 import pandas as pd
-from shutil import copyfile
+
 
 def parse_args():
 	info = """
@@ -17,19 +17,19 @@ def parse_args():
 	parser.add_argument("-c", "--csvs", required=True, type=str, nargs='*', 
 		help="Identify the input csv(s) from collect_decoy_sequences to merge \
 		and identify unique design sequences.")
+	parser.add_argument("-name", "--name", type=str, default='design_models',
+		help="Add a prefix name to the output csv. (By default, it is \
+		design_models.)")
 	parser.add_argument("-od", "--out_dir", type=str, 
 		help="Name an output directory for the consolidated csv and decoys")
+	parser.add_argument("-trim", "--trim_unchanged_cols", action='store_true',
+		help="Exclude columns with no sequence changes from final output.")
 	parser.add_argument("-e", "--copy_extract", action='store_true',
 		help="Copy the representative models to a folder specified by \
 		the decoys_dir argument.")
 	parser.add_argument("-d", "--decoys_dir", type=str, 
 		help="Specify the directory containing the decoys to be copied. \
 		(Unnecessary if copy_extract argument is not given, required if it is.")
-	parser.add_argument("-name", "--name", type=str,
-		help="Add a prefix name to the output csv. (By default, it is \
-		design_models.)")
-	parser.add_argument("-trim", "--trim_unchanged_cols", action='store_true',
-		help="Exclude columns with no sequence changes from final output.")
 	args = parser.parse_args()
 	if args.copy_extract and not args.decoys_dir:
 	    parser.error('If using copy_extract, decoys_dir is required.')
@@ -48,7 +48,7 @@ def make_models_table(csvs, trim=False):
 	sequences_table = pd.DataFrame([])
 	for csv in csvs:
 		df = pd.read_csv(csv, engine='python')
-		sequences_table = sequences_table.append(df)
+		sequences_table = sequences_table.append(df, ignore_index=True)
 
 	# Collapse models table to single representative of each sequence
 	rep_set = sequences_table.loc[
@@ -59,16 +59,21 @@ def make_models_table(csvs, trim=False):
 		len(sequences_table[sequences_table['substitutions'] == 
 		row['substitutions']]), axis='columns')
 
-	# Reorder columns so count and substitutions come before residues
-	cmain = ['name', 'total_energy', 'subs_count', 'substitutions', 'count']
-	csite = [i for i in list(rep_set) if i not in cmain]
-	if trim: # Eliminate unchanged columns from models table
-		cols = cmain + [i for i in csite if len(rep_set[i].unique()) > 1]
-	else:
-		cols = cmain + csite	
-	rep_set = rep_set[cols]
+	# Insert count column before residues
+	col_list = list(sequences_table.columns)
+	subs_col_index = col_list.index('substitutions') + 1
+	col_list.insert(subs_col_index, 'count')
 
-	return rep_set
+	# Remove columns with no changes
+	if trim: # Eliminate unchanged columns from models table
+		subs_columns = col_list[:subs_col_index + 1]
+		for col in col_list[subs_col_index + 1:]:
+			#print(col, len(rep_set[col].unique()))
+			if len(rep_set[col].unique()) > 1:
+				subs_columns.append(col)
+		col_list = subs_columns
+
+	return rep_set[col_list]
 
 
 def main(args):
@@ -76,10 +81,8 @@ def main(args):
 	models_df = make_models_table(args.csvs, trim=args.trim_unchanged_cols)
 
 	# Output models CSV file
-	out_name = 'designs_models.csv'
-	if args.name:
-		out_name = '_'.join([args.name, out_name])
-	out_name = join(ut.out_directory(args.out_dir), out_name)
+	out_name = ut.output_file_name(
+		args.name, path=args.out_dir, extension='csv')
 	models_df.to_csv(out_name, index=False)
 
 	# Copy out representative models
@@ -87,7 +90,7 @@ def main(args):
 		for decoy in models_df['name'].unique():
 			d_in = join(args.decoys_dir, decoy)
 			d_out = join(args.out_dir, decoy)
-			copyfile(d_in, d_out)
+			ut.copy_file(d_in, d_out)
 
 
 if __name__ == '__main__':
