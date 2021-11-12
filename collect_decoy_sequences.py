@@ -67,8 +67,8 @@ def main(args):
 
 	# Iterate through all PDBs to assemble table of sequence changes
 	for p in pdbs_to_check:
-		print('checking pdb {} of {}'.format(
-			pdbs_to_check.index(p) + 1, len(pdbs_to_check)))
+		print('checking pdb {} of {}: {}'.format(
+			pdbs_to_check.index(p) + 1, len(pdbs_to_check), p))
 
 		# Get pdb residue and scores tables
 		pdb = ut.find_maybe_compressed_file(p, gunzip=True)

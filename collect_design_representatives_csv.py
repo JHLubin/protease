@@ -45,26 +45,41 @@ def make_models_table(csvs, trim=False):
 	sequence. 
 	"""
 	# Aggregate input csvs into models table
-	sequences_table = pd.DataFrame([])
+	fragment_dataframes = []
 	for csv in csvs:
 		df = pd.read_csv(csv, engine='python')
-		sequences_table = sequences_table.append(df, ignore_index=True)
+		fragment_dataframes.append(df)
+	sequences_table = pd.concat(fragment_dataframes, ignore_index=True)
 
 	# Collapse models table to single representative of each sequence
 	rep_set = sequences_table.loc[
 		sequences_table.groupby('substitutions')['total_energy'].idxmin()]
 
+	# Separate substitutions column by chains
+	new_cols = []
+	subs_list = ut.flatten_nested_lists(
+		[i.split(';') for i in rep_set['substitutions']])
+	for c in set([i[0] for i in subs_list]):
+		col_name = 'substititions_{}'.format(c)
+		new_cols.append(col_name)
+		rep_set[col_name] = rep_set.apply(lambda row: ';'.join(
+			[i[2:] for i in row['substitutions'].split(';') if i[0]==c]), 
+			axis='columns')
+
 	# Add count columns to models table
+	new_cols.append('count')
 	rep_set['count'] = rep_set.apply(lambda row: 
 		len(sequences_table[sequences_table['substitutions'] == 
 		row['substitutions']]), axis='columns')
 
-	# Insert count column before residues
+	# Insert new substitutions and count columns before residues
 	col_list = list(sequences_table.columns)
 	subs_col_index = col_list.index('substitutions') + 1
-	col_list.insert(subs_col_index, 'count')
+	for c in new_cols[::-1]:
+		col_list.insert(subs_col_index, c)
 
 	# Remove columns with no changes
+	col_list.remove('substitutions')
 	if trim: # Eliminate unchanged columns from models table
 		subs_columns = col_list[:subs_col_index + 1]
 		for col in col_list[subs_col_index + 1:]:
