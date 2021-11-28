@@ -1068,13 +1068,32 @@ def display_alignment(alignment, width=80):
 	num_breaks = ceil(str_len/width)
 
 	# Display sequence
+	first_seq_pos = 0
+	second_seq_pos = 0
 	for n in range(num_breaks):
+		# Calculate break points
 		start = n * width
 		end = (n + 1) * width
-		print(start + 1)
+
+		# Determine non-gap sequence lengths
+		first_seq_len = len([i for i in a_list[0][start:end] if i != '-'])
+		second_seq_len = len([i for i in a_list[2][start:end] if i != '-'])
+
+		# Initialize sequence positions
+		if first_seq_pos == 0 and first_seq_len > 0:
+			first_seq_pos += 1
+		if second_seq_pos == 0 and second_seq_len > 0:
+			second_seq_pos += 1
+
+		print(first_seq_pos)
 		for i in range(3):
 			print(a_list[i][start:end])
-		print('\n')
+		print(second_seq_pos)
+		print('')
+
+		# Increment sequence positions (excluding gaps)
+		first_seq_pos += first_seq_len
+		second_seq_pos += second_seq_len
 
 	# Display other alignment attributes
 	for i in a_list[3:]:
