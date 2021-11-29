@@ -29,6 +29,24 @@ def str2float(v):
 		return v
 
 
+def wrap_string(string, width=60):
+	"""
+	Prints out a string as a set of lines with predefined width
+	"""
+	# Determine line breaks
+	breaks = range(0,len(string), width)
+
+	# Display lines
+	for n, i in enumerate(breaks[:-1]):
+		print(string[i:breaks[n+1]])
+
+	# Edge case to display the last line
+	if len(string) not in breaks:
+		print(string[breaks[-1]:])
+
+	return
+
+
 def find_index(query, match): 
 	""" 
 	Find all instances of match in a query string or list and return their 
