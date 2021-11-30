@@ -953,6 +953,23 @@ def find_aa_in_pdb_atom_table(atom_table, chain, pdb_number, aa1=True):
 		return res_name
 
 
+def atom_table_to_pdb(atom_table, pdb_name):
+	"""
+	Does the reverse operation of tabulate_pdb_atom_lines, converting a PDB atom
+	table back into a PDB with a specified pdb_name.
+	"""
+	# Create PDB line template string
+	pdb_line_string = '{:<4}  {:>5} {:^4}{:<1}{:<3} {:<1}{:>4}     '
+	pdb_line_string += '{:<8}{:<8}{:<8}{:^6}{:^6}      {:<4}{:<4}\n'
+
+	# Write formatted lines to the PDB file
+	with open(pdb_name, 'w') as w:
+		for ind, row in atom_table.iterrows():
+			w.write(pdb_line_string.format(*[str(i) for i in list(row)]))
+
+	return
+
+
 def extract_pdb_energy_lines(pdb):
 	"""
 	Finds and returns the lines from a PDB that include the pose energies	
