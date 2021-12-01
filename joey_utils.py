@@ -911,10 +911,10 @@ def tabulate_pdb_atom_lines(pdb, het=False):
 
 
 def get_pdb_sequences(pdb_atom_table):
-    """
-    Given a PDB atom table from tabulate_pdb_atom_lines, generates a dict of 
-    chains and their sequences
-    """
+	"""
+	Given a PDB atom table from tabulate_pdb_atom_lines, generates a dict of 
+	chains and their sequences
+	"""
 	# Extrat CA-only table to read sequence
 	ca_table = pdb_atom_table[pdb_atom_table['atom_name'] == 'CA']
 
