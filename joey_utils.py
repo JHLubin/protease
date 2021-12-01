@@ -2319,10 +2319,14 @@ def total_energy(pose, score_function, selection=None):
 	return tem.calculate(pose)
 
 
-def interaction_energy(pose, score_function, selection_1, selection_2):
+def interaction_energy(pose, score_function, selection_1, selection_2, 
+	apply_sm=False):
 	"""
 	Given a Rosetta pose, score function, and two residue selectors, 
 	calculates the interaction energy between the selections.
+
+	If apply_sm is True, the SimpleMetric calculation will be added to the 
+	pose energies list and output by the job distributor 
 	"""
 	from pyrosetta.rosetta.core.simple_metrics.metrics import \
 		InteractionEnergyMetric
@@ -2330,6 +2334,9 @@ def interaction_energy(pose, score_function, selection_1, selection_2):
 	interact_metric = InteractionEnergyMetric()
 	interact_metric.set_scorefunction(score_function)
 	interact_metric.set_residue_selectors(selection_1, selection_2)
+
+	if apply_sm:
+		interact_metric.apply(pose)
 	
 	return interact_metric.calculate(pose)
 
