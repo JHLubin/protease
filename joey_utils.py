@@ -1756,15 +1756,18 @@ def find_sequence_in_pose_table(pose_table, sequence, instances=0):
 	instance will be returned, though by default all instances are included.
 	"""
 	# Get initial list of possible sites for sequence, matching the first letter
+	# Exclude sites that would run off the end of the table
 	possible_sites = list(
 		pose_table[pose_table['residue'] == sequence[0]].index)
+	possible_sites = [i for i in possible_sites 
+		if (i+len(sequence)) <= pose_table.idxmax]
 
 	# Iterate through the sequence, at each site narrowing the possible sites
 	# list if the tabulated sequence doesn't match the target
 	for ind, aa in enumerate(sequence):
 		refined_sites = []
 		for site in possible_sites:
-			if pt_h.loc[site + ind]['residue'] == aa:
+			if pose_table.loc[site + ind]['residue'] == aa:
 				refined_sites.append(site)
 		possible_sites = refined_sites
     
