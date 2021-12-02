@@ -1760,7 +1760,7 @@ def find_sequence_in_pose_table(pose_table, sequence, instances=0):
 	possible_sites = list(
 		pose_table[pose_table['residue'] == sequence[0]].index)
 	possible_sites = [i for i in possible_sites 
-		if (i+len(sequence)) <= pose_table.idxmax]
+		if (i+len(sequence)) <= max(pose_table.index)]
 
 	# Iterate through the sequence, at each site narrowing the possible sites
 	# list if the tabulated sequence doesn't match the target
@@ -2415,7 +2415,7 @@ def interaction_energy(pose, score_function, selection_1, selection_2,
 	return interact_metric.calculate(pose)
 
 
-def calc_ddg(pose, score_function=None, jump=1):
+def calc_ddg(pose, score_function=None, jump=1, apply_sm=False):
 	"""
 	Calculates the interfacial change in free energy resulting from binding. 
 	This differs from interaction energy in that it involves a repack of the 
@@ -2425,6 +2425,9 @@ def calc_ddg(pose, score_function=None, jump=1):
 	If no score function is given, a default ref15 will be used.
 
 	By default, the ddG is calculated across the first jump in the pose.
+
+	If apply_sm is True, the SimpleMetric calculation will be added to the 
+	pose energies list and output by the job distributor
 	"""
 	from pyrosetta.rosetta.protocols.simple_ddg import ddG
 
@@ -2435,8 +2438,12 @@ def calc_ddg(pose, score_function=None, jump=1):
 	# Create the scoring metric
 	ddg = ddG(score_function, jump)
 
-	# Calculate ddG
-	ddg.calculate(pose)
+	# Apply to pose or at least calculate
+	if apply_sm:
+		ddg.apply(pose)
+	else:
+		ddg.calculate(pose)
+		
 	return ddg.sum_ddG()
 
 
