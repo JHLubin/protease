@@ -48,7 +48,7 @@ def main(args):
 	if args.name: 
 		out_name = ut.output_file_name(args.name, path=args.out_dir)
 	else:
-		out_name = ut.output_file_name(args.pdb_file, pathargs.out_dir, 
+		out_name = ut.output_file_name(args.pdb_file, path=args.out_dir, 
 			suffix='relaxed', extension=None)
 
 	# Add name suffix
