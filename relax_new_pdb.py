@@ -36,19 +36,19 @@ def parse_args():
 	parser.add_argument('-cwt', "--constraint_weight", type=float, default=None,
 		help="Specify the constraints weight for coordinates and enzdes \
 		(Default: 1.0)")
+	parser.add_argument("-nocons", "--no_constraints", action="store_true", 
+		help="Option to not apply coordinate constraints to the pose when \
+		relaxing.")
 	args = parser.parse_args()
 	return args
 
 
 def main(args):
-	# Destination folder for PDB files
-	od = ut.out_directory(args.out_dir)
-
 	# Determining file name
 	if args.name: 
-		out_name = ut.output_file_name(args.name, path=od)
+		out_name = ut.output_file_name(args.name, path=args.out_dir)
 	else:
-		out_name = ut.output_file_name(args.pdb_file, path=od, 
+		out_name = ut.output_file_name(args.pdb_file, pathargs.out_dir, 
 			suffix='relaxed', extension=None)
 
 	# Add name suffix
@@ -56,8 +56,11 @@ def main(args):
 		out_name = ut.output_file_name(out_name, suffix=args.name_suffix)
 
 	# Loading pose and applying constraints, symmetry, 
+	coord_cst = True
+	if args.no_constraints:
+		coord_cst = False
 	pose = ut.load_pose(args.pdb_file, enzdes_cst=args.constraints, 
-		coord_cst=True, symmetry=args.symmetry, membrane=None)
+		coord_cst=coord_cst, symmetry=args.symmetry, membrane=None)
 
 	# Setting up the scorefunction with the desired constraint weights
 	sf = ut.get_sf(rep_type='hard', symmetry=args.symmetry, membrane=0, 
