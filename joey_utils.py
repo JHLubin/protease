@@ -121,6 +121,15 @@ def split_string_at_numbers(string):
 
 	return [str2int(i) for i in out_str.split('~insert_break_here~')]
 
+
+def join_list(item_list, joiner=''):
+	"""
+	Convert a list into a string of items. By default, there will be nothing 
+	between joined items, though different joiner strings can be used. List
+	does not need to be converted to strings first.
+	"""
+	return joiner.join([str(i) for i in item_list])
+
 ################################################################################
 # Protein-specific text functions
 
@@ -1617,37 +1626,6 @@ def get_b_factor(pose, residue):
 	return total_b / 3
 
 
-def sasa_metric(pose, selection=None, sasa_mode='all_sasa', apply_sm=False):
-	"""
-	Calculates solvent-accessible surface area for a pose or a selected part of 
-	a pose. Can calculate for all residues, or restrict to just polars or just
-	hydrophobics. Mode must be either all_sasa, polar_sasa, or hydrophobic_sasa.
-
-	If apply_sm is True, the SimpleMetric calculation will be added to the 
-	pose energies list and output by the job distributor 
-	"""
-	from pyrosetta.rosetta.core.simple_metrics.metrics import SasaMetric 
-
-	# Confirm acceptable mode selection
-	if sasa_mode not in ['all_sasa', 'polar_sasa', 'hydrophobic_sasa']:
-		raise ValueError(
-			"sasa_mode must be 'all_sasa', 'polar_sasa', or 'hydrophobic_sasa'")
-
-	# Create the simple metric
-	sasa = SasaMetric()
-	sasa.set_sasa_metric_mode('all_sasa')
-
-	# Adjust for residue selection
-	if selection:
-		sasa.set_residue_selector(selection)
-
-	# Apply to the pose
-	if apply_sm:
-		sasa.apply(pose)
-
-	return sasa.calculate(pose)
-
-
 def tabulate_pose_residues(pose, ss=False, dihedrals=False, b_factor=False,
 	res_name=1):
 	"""
@@ -1978,6 +1956,37 @@ def check_coevolution(pose, substitutions, score_function=None):
 	# When either an interaction is found or when iteration completes, return
 	# whether sites interact
 	return sites_interact
+
+
+def sasa_metric(pose, selection=None, sasa_mode='all_sasa', apply_sm=False):
+	"""
+	Calculates solvent-accessible surface area for a pose or a selected part of 
+	a pose. Can calculate for all residues, or restrict to just polars or just
+	hydrophobics. Mode must be either all_sasa, polar_sasa, or hydrophobic_sasa.
+
+	If apply_sm is True, the SimpleMetric calculation will be added to the 
+	pose energies list and output by the job distributor 
+	"""
+	from pyrosetta.rosetta.core.simple_metrics.metrics import SasaMetric 
+
+	# Confirm acceptable mode selection
+	if sasa_mode not in ['all_sasa', 'polar_sasa', 'hydrophobic_sasa']:
+		raise ValueError(
+			"sasa_mode must be 'all_sasa', 'polar_sasa', or 'hydrophobic_sasa'")
+
+	# Create the simple metric
+	sasa = SasaMetric()
+	sasa.set_sasa_metric_mode('all_sasa')
+
+	# Adjust for residue selection
+	if selection:
+		sasa.set_residue_selector(selection)
+
+	# Apply to the pose
+	if apply_sm:
+		sasa.apply(pose)
+
+	return sasa.calculate(pose)
 
 ################################################################################
 # Selectors (functions require PyRosetta)
@@ -2443,7 +2452,7 @@ def calc_ddg(pose, score_function=None, jump=1, apply_sm=False):
 		ddg.apply(pose)
 	else:
 		ddg.calculate(pose)
-		
+
 	return ddg.sum_ddG()
 
 
