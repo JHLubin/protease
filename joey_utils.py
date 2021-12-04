@@ -2359,30 +2359,6 @@ def get_sf(rep_type='hard', symmetry=False, membrane=0, constrain=1.0,
 	return score_function
 
 
-def calc_single_res_Es(pose, sf, single_chain=0, selection=None):
-	"""
-	For a given pose and score function, returns a list of single-residue
-	energies. If single_chain is true, only returns energies for the given 
-	chain. Providing a residue selection will limit the per-residue energy 
-	calculation to the residues in that selection.
-	"""
-	from pyrosetta.rosetta.core.simple_metrics.per_residue_metrics import \
-	PerResidueEnergyMetric
-
-	prem = PerResidueEnergyMetric()
-	prem.set_scorefunction(sf)
-	if selection:
-		prem.set_residue_selector(selection)
-	
-	e_vals = prem.calculate(pose)
-
-	if single_chain:
-		return [e_vals[i] for i in range(pose.chain_begin(single_chain), 
-			pose.chain_end(single_chain) + 1)]   
-	else:
-		return [e_vals[i] for i in range(1, pose.total_residue() + 1)]
-
-
 def total_energy(pose, score_function, selection=None):
 	"""
 	Calculates total energy of a pose using a TotalEnergyMetric. If a selector
@@ -2400,6 +2376,24 @@ def total_energy(pose, score_function, selection=None):
 		tem.set_residue_selector(selection)
 		
 	return tem.calculate(pose)
+
+
+def calc_single_res_Es(pose, score_function, selection=None):
+	"""
+	For a given pose and score function, returns a list of single-residue
+	energies. Providing a residue selection will limit the per-residue energy 
+	calculation to the residues in that selection.
+	"""
+	from pyrosetta.rosetta.core.simple_metrics.per_residue_metrics import \
+	PerResidueEnergyMetric
+
+	prem = PerResidueEnergyMetric()
+	prem.set_scorefunction(score_function)
+	if selection:
+		prem.set_residue_selector(selection)
+	
+	e_vals = prem.calculate(pose)
+	return [energy for res, energy in e_vals.items()]
 
 
 def interaction_energy(pose, score_function, selection_1, selection_2, 
@@ -2422,6 +2416,23 @@ def interaction_energy(pose, score_function, selection_1, selection_2,
 		interact_metric.apply(pose)
 	
 	return interact_metric.calculate(pose)
+
+
+def calc_single_res_intEs(pose, score_function, focus_selection, 
+	interaction_target):
+	"""
+	For a given pose and score function, returns a list of single-residue
+	interaction energies for all residues in a focus selection with a 
+	specified target selection.
+	"""
+	intE_list = []
+	for res in selector_to_list(pose, focus_selection):
+		res_selection = index_selector(res)
+		intE = interaction_energy(pose, score_function, res_selection, 
+			interaction_target)
+		intE_list.append(intE)
+
+	return intE_list
 
 
 def calc_ddg(pose, score_function=None, jump=1, apply_sm=False):
