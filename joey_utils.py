@@ -2075,9 +2075,33 @@ def close_selector(focus, threshold=4.5):
 	ccrs.threshold(threshold)
 
 	return ccrs
+
+
+def one_side_close_selector(included_side, excluded_side, threshold=4.5):
+	"""
+	CloseContactResidueSelector selects the interfacial residues 
+	between a pair of selections, including residues from both sides. This 
+	function changes the behavior, selecting only the residues on the 
+	included_side of the interface between two selections.
+	"""
+	# Create interface selection
+	close_residues = close_selector(included_side, threshold=threshold)
+
+	# Exclude residues on the excluded_side
+	return selector_intersection(included_side, close_residues)
+
+
+def close_with_selection_selector(selection, threshold=4.5):
+	"""
+	Similar to a neighbor_selector with include_focus=False, but using
+	an CloseContactResidueSelector instead of a 
+	NeighborhoodResidueSelector. 
+	"""
+	return one_side_close_selector(selection, not_selector(selection), 
+		threshold=threshold)
 	
 
-def intergroup_selector(s1, s2, 
+def intergroup_selector(selector_1, selector_2, 
 	nearby_atom=5.5, cb_dist=11.0, vector_angle=75.0, vector_dist=9.0):
 	"""
 	Creates an InterGroupInterfaceByVectorSelector from two other selectors.
@@ -2097,8 +2121,8 @@ def intergroup_selector(s1, s2,
 	inter_selector = InterGroupInterfaceByVectorSelector()
 
 	# Add selections to check interface
-	inter_selector.group1_selector(s1)
-	inter_selector.group2_selector(s2)
+	inter_selector.group1_selector(selector_1)
+	inter_selector.group2_selector(selector_2)
 
 	# Set interface detection parameters
 	inter_selector.nearby_atom_cut(nearby_atom)
@@ -2109,7 +2133,8 @@ def intergroup_selector(s1, s2,
 	return inter_selector
 
 
-def one_side_interface_selector(included_side, excluded_side):
+def one_side_interface_selector(included_side, excluded_side, 
+	nearby_atom=5.5, cb_dist=11.0, vector_angle=75.0, vector_dist=9.0):
 	"""
 	InterGroupInterfaceByVectorSelector selects the interfacial residues 
 	between a pair of selections, including residues from both sides. This 
@@ -2117,21 +2142,83 @@ def one_side_interface_selector(included_side, excluded_side):
 	included_side of the interface between two selections.
 	"""
 	# Create interface selection
-	interface_residues = intergroup_selector(included_side, excluded_side)
+	interface_residues = intergroup_selector(included_side, excluded_side,
+		nearby_atom=nearby_atom, cb_dist=cb_dist, vector_angle=vector_angle, 
+		vector_dist=vector_dist)
 
 	# Exclude residues on the excluded_side
-	return selector_intersection(
-		not_selector(excluded_side), interface_residues)
+	return selector_intersection(included_side, interface_residues)
 
 
-def interface_with_selection_selector(selection):
+def interface_with_selection_selector(selection, 
+	nearby_atom=5.5, cb_dist=11.0, vector_angle=75.0, vector_dist=9.0):
 	"""
 	Similar to a neighbor_selector with include_focus=False, but using
 	an InterGroupInterfaceByVectorSelector instead of a 
 	NeighborhoodResidueSelector. 
 	"""
-	return one_side_interface_selector(
-		not_selector(selection), selection)
+	return one_side_interface_selector(selection, not_selector(selection),
+		nearby_atom=nearby_atom, cb_dist=cb_dist, vector_angle=vector_angle, 
+		vector_dist=vector_dist)
+
+
+def close_and_interface_selector(selector_1, selector_2,  
+	nearby_atom=5.5, cb_dist=11.0, vector_angle=75.0, vector_dist=9.0, 
+	atom_dist_threshold=4.5):
+	"""
+	Creates an interfacial selection, combining both CloseContactResidueSelector
+	to detect touching residues and InterGroupInterfaceByVectorSelector to 
+	detect residues with the design potential to touch.
+
+	Defaults:
+		nearby_atom				 5.5
+		cb_dist					11.0
+		vector_angle			75.0
+		vector_dist				 9.0
+		atom_dist_threshold	 4.5
+	"""
+	# Create CloseContactResidueSelector
+	close_selector_1 = close_selector(selector_1, threshold=atom_dist_threshold)
+	close_selector_2 = close_selector(selector_2, threshold=atom_dist_threshold)
+	close = selector_intersection(close_selector_1, close_selector_2)
+
+	# Create InterGroupInterfaceByVectorSelector
+	intergroup = intergroup_selector(selector_1, selector_2,
+		nearby_atom=nearby_atom, cb_dist=cb_dist, vector_angle=vector_angle, 
+		vector_dist=vector_dist)
+
+	return selector_union(close, intergroup)
+
+
+def one_side_close_and_interface_selector(included_side, excluded_side, 
+	nearby_atom=5.5, cb_dist=11.0, vector_angle=75.0, vector_dist=9.0, 
+	atom_dist_threshold=4.5):
+	"""
+	close_and_interface_selector selects the interfacial residues between a 
+	pair of selections, including residues from both sides. This function 
+	changes the behavior, selecting only the residues on the included_side 
+	of the interface between two selections.
+	"""
+	# Create interface selection
+	interface_residues = close_and_interface_selector(included_side, 
+		excluded_side, nearby_atom=nearby_atom, cb_dist=cb_dist, 
+		vector_angle=vector_angle, vector_dist=vector_dist, 
+		atom_dist_threshold=atom_dist_threshold)
+
+	# Exclude residues on the excluded_side
+	return selector_intersection(included_side, interface_residues)
+
+
+def close_interface_with_selection_selector(selection, nearby_atom=5.5, 
+	cb_dist=11.0, vector_angle=75.0, vector_dist=9.0, atom_dist_threshold=4.5):
+	"""
+	Similar to a neighbor_selector with include_focus=False, but using
+	a close_and_interface_selector instead of a NeighborhoodResidueSelector. 
+	"""
+	return one_side_close_and_interface_selector(selection, 
+		not_selector(selection), nearby_atom=nearby_atom, cb_dist=cb_dist, 
+		vector_angle=vector_angle, vector_dist=vector_dist, 
+		atom_dist_threshold=atom_dist_threshold)
 
 
 def neighbor_selector(selection, include_focus=False, distance=8):
