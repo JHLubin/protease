@@ -1530,6 +1530,20 @@ def pdb2pose(pose, residue, chain='A'):
 	return pose.pdb_info().pdb2pose(chain, residue)	
 
 
+def find_res_aa(pose, residue, name_length=1):
+	"""
+	Find what AA is in a given pose position. By default, gives the 1-letter
+	name. Can give the 3-letter instead. name_length must be either 1 or 3.
+	"""
+	if name_length not in [1, 3]:
+		raise ValueError('Amino acid name length must be either 1 or 3.')
+
+	if name_length == 1:
+		return pose.residue(residue).name1()
+	else:
+		return pose.residue(residue).name3()
+
+
 def find_res_atom(pose, resnum, atom_type='CA'):
 	""" 
 	For a given pose and residue number, returns the a specified Atom object 
@@ -1662,11 +1676,11 @@ def tabulate_pose_residues(pose, ss=False, dihedrals=False, b_factor=False,
 		pose_dict['pose_number'].append(res)
 		# Residue name
 		if res_name == 0:
-			pose_dict['residue'].append(pose.residue(res).name())
+			pose_dict['residue'].append(find_res_aa(pose, res, 3))
 		elif res_name == 3:
-			pose_dict['residue'].append(pose.residue(res).name3())
+			pose_dict['residue'].append(find_res_aa(pose, res, 3))
 		else:
-			pose_dict['residue'].append(pose.residue(res).name1())
+			pose_dict['residue'].append(find_res_aa(pose, res, 1))
 		# Extra info
 		if dihedrals:
 			pose_dict['phi'].append(pose.phi(res))
