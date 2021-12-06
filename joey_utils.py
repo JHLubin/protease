@@ -2517,6 +2517,32 @@ def calc_single_res_intEs(pose, score_function, focus_selection,
 	return intE_list
 
 
+def calc_single_res_intra_selection_intEs(pose, score_function, 
+	focus_selection, sub_selection=None):
+	"""
+	For a given pose and score function, returns a list of single-residue
+	interaction energies for all residues within a focus selection with all 
+	other residues in that selection. Providing a sub_selection that includes
+	a subset of the focus_selection will result in the energies for only the 
+	residues in the sub_selection being calculated.
+	"""
+	# Determine restricted selection
+	if sub_selection == None:
+		sub_selection = focus_selection
+
+	# Calculate per-res intra-selection interaction energies
+	intE_list = []
+	for res in selector_to_list(pose, sub_selection):
+		res_selection = index_selector(res)
+		not_res_selection = selector_intersection(focus_selection, 
+			not_selector(res_selection))
+		intE = interaction_energy(pose, score_function, res_selection, 
+			not_res_selection)
+		intE_list.append(intE)
+
+	return intE_list
+
+
 def calc_ddg(pose, score_function=None, jump=1, apply_sm=False):
 	"""
 	Calculates the interfacial change in free energy resulting from binding. 
