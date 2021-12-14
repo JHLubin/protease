@@ -827,6 +827,37 @@ def fix_pdb(pdb, extension=None, clobber=False):
 
 	return
 
+
+def check_decoy_counts(decoy_dir, decoy_name_list, decoy_count):
+	"""
+	Given a list of base names and an expected decoy count, returns a list of 
+	names that didn't run at all and a dict of names with how many decoys short
+	of the expected count they are.
+	"""
+	from glob import glob 
+
+	# Initialize collection lists
+	pdbs_that_didnt_process = []
+	pdbs_missing_decoys = {}
+
+	# Iterate through decoy name list, checking decoy counts
+	for dec_name in decoy_name_list:
+		# Collet list of all decoys with the given base name
+		decoys = glob(output_file_name(dec_name, path=decoy_dir, 
+			extension='pdb', suffix='*'))
+
+		# If the list is empty, add to the didnt_process list
+		if len(decoys) == 0:
+			pdbs_that_didnt_process.append(dec_name)
+			continue
+
+		# If the list is incomplete, add to the missing_decoys dict
+		if len(decoys) != decoy_count:
+			missing_decs[dec_name] = decoy_count - len(decoys)
+
+
+	return pdbs_that_didnt_process, pdbs_missing_decoys
+
 ################################################################################
 # PDB informatics functions
 
@@ -898,7 +929,7 @@ def tabulate_pdb_atom_lines(pdb, het=False):
 	# Define columns
 	pdb_atom_cols = {'type': (0, 4), 'atom_number': (6, 11), 
 		'atom_name': (12, 16), 'alt_location': (16, 17), 'res_name': (17, 20), 
-		'chain_id': (21,22), 'res_number': (22, 26), 'x': (30, 38), 
+		'chain_id': (21,22), 'res_number': (22, 27), 'x': (30, 38), 
 		'y': (38, 46), 'z':(46,54), 'occupancy': (54, 60), 
 		'b-factor': (60, 66), 'segment': (72, 76), 'element': (76, 80)}
 
@@ -912,7 +943,7 @@ def tabulate_pdb_atom_lines(pdb, het=False):
 
 	# Convert columns from strings to numeric where appropriate
 	for col in ['atom_number', 'res_number']:
-		atom_table[col] = atom_table[col].astype(int)
+		atom_table[col] = atom_table[col].astype(int, errors='ignore')
 	for col in ['x', 'y', 'z', 'b-factor', 'occupancy']:
 		atom_table[col] = atom_table[col].astype(float)
 
@@ -968,7 +999,7 @@ def atom_table_to_pdb(atom_table, pdb_name):
 	table back into a PDB with a specified pdb_name.
 	"""
 	# Create PDB line template string
-	pdb_line_string = '{:<4}  {:>5} {:^4}{:<1}{:<3} {:<1}{:>4}     '
+	pdb_line_string = '{:<4}  {:>5} {:^4}{:<1}{:<3} {:<1}{:^5}    '
 	pdb_line_string += '{:<8}{:<8}{:<8}{:^6}{:^6}      {:<4}{:<4}\n'
 
 	# Write formatted lines to the PDB file
