@@ -23,11 +23,12 @@ def parse_args():
 	parser.add_argument("-s", "--selection_criterion", type=str, 
 		default='total_score', help="By what property should best decoys be \
 		selected? Default is total_score.")
-	parser.add_argument("-m", "--merge_fascs", action='store_true', 
+	parser.add_argument("-m", "--merge_fascs", type=int, default=0, 
 		help="If multiple .fasc files were created for a single set, this \
 		option allows them to be sorted together. It is assumed that the \
 		difference will only be in numbers after an underscore, and that the \
-		beginning name will be the same for all clustered .fasc files.")
+		beginning name will be the same for all clustered .fasc files. The \
+		integer is the number of underscore levels to merge.")
 	args = parser.parse_args()
 	return args
 
@@ -212,7 +213,9 @@ def main(args):
 		fasc_groups = {}
 		for f in fasc_files:
 			fasc_base = os.path.basename(f)
-			fasc_cluster = fasc_base[:fasc_base.rfind('_')]
+			fasc_cluster = fasc_base
+			for i in range(args.merge_fascs):
+				fasc_cluster = fasc_cluster[:fasc_cluster.rfind('_')]
 			if fasc_cluster in fasc_groups:
 				fasc_groups[fasc_cluster].append(f)
 			else: 
