@@ -645,6 +645,22 @@ def copy_file(input_filename, output_filename, gunzip=False, gzip=False):
 	return output_filename
 
 
+def move_file(input_filename, output_filename, gunzip=False, gzip=False):
+	"""
+	Moves a file. Differs from default shutil move in that there is a check
+	for whether the file is zipped.
+	"""
+	from shutil import move
+
+	# Get input file
+	input_filename = find_maybe_compressed_file(
+		input_filename, gunzip=gunzip, gzip=gzip)
+
+	move(input_filename, output_filename)
+
+	return output_filename
+
+
 def out_directory(directory_name):
 	"""
 	Given an output directory string, checks whether that directory exists.  
@@ -2256,8 +2272,8 @@ def close_interface_with_selection_selector(selection, nearby_atom=5.5,
 	Similar to a neighbor_selector with include_focus=False, but using
 	a close_and_interface_selector instead of a NeighborhoodResidueSelector. 
 	"""
-	return one_side_close_and_interface_selector(selection, 
-		not_selector(selection), nearby_atom=nearby_atom, cb_dist=cb_dist, 
+	return one_side_close_and_interface_selector(not_selector(selection), 
+		selection, nearby_atom=nearby_atom, cb_dist=cb_dist, 
 		vector_angle=vector_angle, vector_dist=vector_dist)
 
 
