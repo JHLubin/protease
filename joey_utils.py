@@ -971,7 +971,7 @@ def get_pdb_sequences(pdb_atom_table):
 	Given a PDB atom table from tabulate_pdb_atom_lines, generates a dict of 
 	chains and their sequences
 	"""
-	# Extrat CA-only table to read sequence
+	# Extract CA-only table to read sequence
 	ca_table = pdb_atom_table[pdb_atom_table['atom_name'] == 'CA']
 
 	# Create dict of chains and sequences
@@ -1007,6 +1007,54 @@ def find_aa_in_pdb_atom_table(atom_table, chain, pdb_number, aa1=True):
 		return convert_aa_name(res_name)
 	else:
 		return res_name
+
+
+def check_pdb_atom_table_contiguity(atom_table, min_res=1, max_res=0):
+	"""
+	PDB files may include missing residues or insertion residues (such as 
+	antibody CDR loops with redundant numbering). This function checks whether 
+	an atom table made by tabulate_pdb_atom_lines is missing residues or has 
+	insertions. Residues with lettered names (which don't convert to integers) 
+	are identified as insertions. Deletions are identified by finding gaps in a 
+	range, which by default goes from 1 to the max residue number of each chain, 
+	though the bounds can be set manually (min_res, max_res) or automatically 
+	identify the range of the chain (by setting the value to 0). Returns a dict 
+	of dicts. Outer: insertions, deletions; inner: a list for each chain.
+	"""
+	# Extract CA-only table to read sequence
+	ca_table = atom_table[atom_table['atom_name'] == 'CA']
+
+	# Initialize report dict
+	residue_indels = {i:{} for i in ['insertions', 'deletions']}
+
+	# Iterate through all chains to collect indels
+	for chain in ca_table['chain_id'].unique():
+		# Isolate single chain
+		chain_ca_table = ca_table[ca_table['chain_id'] == chain]
+
+		# List all residues
+		res_list = [str2int(i) for i in chain_ca_table['res_number']]
+
+		# Identify insertions
+		insertion_residues = [i for i in res_list if type(i) != int]
+		residue_indels['insertions'][chain] = insertion_residues
+
+		# Finding missing residues
+		res_list = [res for res in res_list if res not in insertion_residues]
+		## Determine chain min residue
+		chain_min = min_res
+		if min_res == 0:
+			chain_min =  min(res_list)
+		## Determine chain max residue
+		chain_max = max_res
+		if max_res == 0:
+			chain_max =  max(res_list)
+		## Check for gaps in residue number list
+		missing_res = [res for res in range(chain_min, chain_max + 1) 
+			if res not in res_list]
+		residue_indels['deletions'][chain] = missing_res
+
+	return residue_indels
 
 
 def atom_table_to_pdb(atom_table, pdb_name):
@@ -2158,7 +2206,7 @@ def close_with_selection_selector(selection, threshold=5.5):
 	an CloseContactResidueSelector instead of a 
 	NeighborhoodResidueSelector. 
 	"""
-	return one_side_close_selector(selection, not_selector(selection), 
+	return one_side_close_selector(not_selector(selection),selection,  
 		threshold=threshold)
 	
 
@@ -2218,7 +2266,7 @@ def interface_with_selection_selector(selection,
 	an InterGroupInterfaceByVectorSelector instead of a 
 	NeighborhoodResidueSelector. 
 	"""
-	return one_side_interface_selector(selection, not_selector(selection),
+	return one_side_interface_selector(not_selector(selection), selection, 
 		nearby_atom=nearby_atom, cb_dist=cb_dist, vector_angle=vector_angle, 
 		vector_dist=vector_dist)
 
