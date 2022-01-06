@@ -1625,6 +1625,17 @@ def pdb2pose(pose, residue, chain='A'):
 	return pose.pdb_info().pdb2pose(chain, residue)	
 
 
+def get_pose_chain_list(pose):
+	"""
+	Get a list of chain names in a pose
+	"""
+	pose_chains = []
+	for chain in range(1, pose.num_chains() + 1):
+		pose_chains.append(pose.pdb_info().chain(pose.chain_begin(chain)))
+
+	return pose_chains
+
+
 def find_res_aa(pose, residue, name_length=1):
 	"""
 	Find what AA is in a given pose position. By default, gives the 1-letter
