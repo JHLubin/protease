@@ -2354,6 +2354,31 @@ def neighbor_selector(selection, include_focus=False, distance=8):
 	return neighbor_selection
 
 
+def secstruct_selector(ss, minE=3, minH=4):
+	"""
+	Creates a SecondaryStructureSelector with adjusted defaults for minimal 
+	qualifying element length for sheets and helices. ss should be a string,
+	'E', 'H', or 'L', or a combination thereof ex ('HL'). 
+	"""
+	from pyrosetta.rosetta.core.select.residue_selector import \
+		SecondaryStructureSelector
+
+	# Check correct input
+	for ss_type in ss:
+		if ss_type not in ['E', 'H', 'L']:
+			raise ValueError('{} is not a secondary structure. Secondary \
+				structure options are E, H, and L.'.format(ss_type).replace(
+				'\t', ''))
+
+	# Create selector
+	sss = SecondaryStructureSelector()
+	sss.set_selected_ss(ss)
+	sss.set_minE(minE)
+	sss.set_minH(minH)
+
+	return sss
+
+
 def layer_selector(layer):
 	""" 
 	Creates a layer selector, based on a string input. Layers are:
