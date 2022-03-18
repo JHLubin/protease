@@ -121,15 +121,6 @@ def split_string_at_numbers(string):
 
 	return [str2int(i) for i in out_str.split('~insert_break_here~')]
 
-
-def join_list(item_list, joiner=''):
-	"""
-	Convert a list into a string of items. By default, there will be nothing 
-	between joined items, though different joiner strings can be used. List
-	does not need to be converted to strings first.
-	"""
-	return joiner.join([str(i) for i in item_list])
-
 ################################################################################
 # Protein-specific text functions
 
@@ -283,6 +274,15 @@ def is_conservative(wt_aa, mut_aa):
 
 ################################################################################
 # List manipulation functions
+
+def join_list(item_list, joiner=''):
+	"""
+	Convert a list into a string of items. By default, there will be nothing 
+	between joined items, though different joiner strings can be used. List
+	does not need to be converted to strings first.
+	"""
+	return joiner.join([str(i) for i in item_list])
+
 
 def partition_list(in_list, partitions, member):
 	"""
@@ -1965,26 +1965,140 @@ def identify_res_layer(pose, res_number, target_chain=None):
 		return 'SURFACE'
 
 
-def rmsd_metric(ref_pose):
+def rmsd_type(r_type='bb_ca'):
 	"""
-	Creates an RMSD metric based on a reference pose
+	By default, RMSDs are calculated for backbone CAs. This function allows
+	for selection of alternative RMSD methods.
+
+	Options:
+		'bb_ca' 		# Default
+		'bb_heavy'
+		'bb'
+		'sc_heavy'
+		'sc'
+		'all_heavy'
+		'all'
+	"""
+	from pyrosetta.rosetta.core.scoring import rmsd_atoms
+
+	# Check correct input
+	rmsd_type_options = ['bb_ca', 'bb_heavy', 'bb', 'sc_heavy', 'sc', 
+		'all_heavy', 'all', None]
+	if r_type not in rmsd_type_options:
+		print("You have entered an invalid RMSD type. Select from:")
+		for rt in rmsd_type_options[:-1]:
+			print('\t--', rt)
+		raise ValueError('Invalid RMSD type')
+
+	# Convert None to default
+	if r_type == None:
+		r_type = 'bb_ca'
+
+	# Get RMSD type
+	rmsd_types = {
+		'bb_ca': rmsd_atoms.rmsd_protein_bb_ca,
+		'bb_heavy': rmsd_atoms.rmsd_protein_bb_heavy,
+		'bb': rmsd_atoms.rmsd_protein_bb_heavy_including_O,
+		'sc_heavy': rmsd_atoms.rmsd_sc_heavy,
+		'sc': rmsd_atoms.rmsd_sc,
+		'all_heavy': rmsd_atoms.rmsd_all_heavy,
+		'all': rmsd_atoms.rmsd_all
+		}
+	return rmsd_types['bb_ca']
+
+
+def rmsd_metric(ref_pose, ref_calc_selection=None, target_calc_selection=None, 
+	ref_align_selection=None, target_align_selection=None, r_type=None):
+	"""
+	Creates an RMSD metric based on a reference pose. 
+
+	Selectors can be provided to align and/or calculate RMSDs based on subsets 
+	of the pose. By default, the calculation will align and evaluate based on 
+	the whole pose (poses must be the same number of residues). Giving selectors 
+	for ref and target calc_selection will result in the RMSD being calculated 
+	only for selected residues. Giving selectors for ref and target 
+	align_selection will result in the poses being aligned based on only 
+	selected residues. Selections must be given in pairs, and selections for ref 
+	and target must include the same number of residues in each selection 
+	category. If calculation selections are given without alignment selections, 
+	alignment will use the calculation selections.
+
+	r_type sets the RMSD calculation type. Options are:
+		'bb_ca'		# Default
+		'bb_heavy'
+		'bb'
+		'sc_heavy'
+		'sc'
+		'all_heavy'
+		'all'
 	"""
 	from pyrosetta.rosetta.core.simple_metrics.metrics import RMSDMetric
+
+	# Confirming paired selector arguments
+	if not any([
+		ref_calc_selection == None and target_calc_selection == None,
+		ref_calc_selection != None and target_calc_selection != None]):
+		raise ValueError("""Reference and taget calculation selections must be 
+			submitted together.""")
+	if not any([
+		ref_align_selection == None and target_align_selection == None,
+		ref_align_selection != None and target_align_selection != None]):
+		raise ValueError("""Reference and taget alignment selections must be 
+			submitted together.""")
+
+	# Set selector defaults
+	if ref_calc_selection == None:
+		ref_calc_selection = full_selector()
+	if target_calc_selection == None:
+		target_calc_selection = full_selector()
+	if ref_align_selection == None:
+		ref_align_selection = ref_calc_selection
+	if target_align_selection == None:
+		target_align_selection = target_calc_selection
 
 	# Create the RMSDMetric with reference pose
 	rmsd_metric = RMSDMetric()
 	rmsd_metric.set_comparison_pose(ref_pose)
+	rmsd_metric.set_rmsd_type(rmsd_type(r_type))
+	rmsd_metric.set_run_superimpose(True)
+	rmsd_metric.set_residue_selector_reference(ref_calc_selection)
+	rmsd_metric.set_residue_selector(target_calc_selection)
+	rmsd_metric.set_residue_selector_super_reference(ref_align_selection)
+	rmsd_metric.set_residue_selector_super(target_align_selection)
 
 	return rmsd_metric
 
 
-def get_rmsd(ref_pose, pose):
+def get_rmsd(ref_pose, pose, 
+	ref_calc_selection=None, target_calc_selection=None, 
+	ref_align_selection=None, target_align_selection=None, r_type=None):
 	"""
 	Given two poses of equal size, determines RMSD. The first pose is the 
-	one to which the second is compared.
+	one to which the second is compared. 
+
+	Selectors can be provided to align and/or calculate RMSDs based on subsets 
+	of the pose. By default, the calculation will align and evaluate based on 
+	the whole pose (poses must be the same number of residues). Giving selectors 
+	for ref and target calc_selection will result in the RMSD being calculated 
+	only for selected residues. Giving selectors for ref and target 
+	align_selection will result in the poses being aligned based on only 
+	selected residues. Selections must be given in pairs, and selections for ref 
+	and target must include the same number of residues in each selection 
+	category. If calculation selections are given without alignment selections, 
+	alignment will use the calculation selections.
+
+	r_type sets the RMSD calculation type. Options are:
+		'bb_ca'		# Default
+		'bb_heavy'
+		'bb'
+		'sc_heavy'
+		'sc'
+		'all_heavy'
+		'all'
 	"""
 	# Create the RMSDMetric, setting pose_1 as the reference
-	rmet = rmsd_metric(ref_pose)
+	rmet = rmsd_metric(ref_pose, ref_calc_selection, target_calc_selection, 
+	ref_align_selection, target_align_selection, r_type)
 
 	# Use the RMSDMetirc to calculate the RMSD of pose_2
 	rmsd = rmet.calculate(pose)
@@ -2157,7 +2271,7 @@ def index_selector(indices):
 		return ResidueIndexSelector(str(indices))
 
 	if type(indices) in [list, range]:
-		ind_str = ','.join([str(i) for i in indices])
+		ind_str = join_list(indices, ',')
 		return ResidueIndexSelector(ind_str)
 
 
@@ -2359,6 +2473,11 @@ def secstruct_selector(ss, minE=3, minH=4):
 	Creates a SecondaryStructureSelector with adjusted defaults for minimal 
 	qualifying element length for sheets and helices. ss should be a string,
 	'E', 'H', or 'L', or a combination thereof ex ('HL'). 
+
+	Defaults of the function differ from the SecondaryStructureSelector 
+	default lengths for counting sheets and helices. Single-residue elements 
+	don't count. Sheets must be at least three residues long to form the proper 
+	H-bonds, and helices must be at least 4.
 	"""
 	from pyrosetta.rosetta.core.select.residue_selector import \
 		SecondaryStructureSelector
