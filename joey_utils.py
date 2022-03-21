@@ -682,6 +682,15 @@ def move_file(input_filename, output_filename, gunzip=False, gzip=False):
 	return output_filename
 
 
+def delete_file(file_name):
+	""" Deletes a file """
+	from os import remove
+
+	os.remove(find_maybe_compressed_file(file_name))
+
+	return
+
+
 def out_directory(directory_name):
 	"""
 	Given an output directory string, checks whether that directory exists.  
