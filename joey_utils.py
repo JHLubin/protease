@@ -505,6 +505,27 @@ def sum_squares(array):
 	"""
 	return sum(i ** 2 for i in array)
 
+
+def interquartile_bounds(array):
+	"""
+	For a given array, calculates the boundaries for outlier classification, 
+	based on being more than 1.5 * (interquartile range) above or below the 
+	quartiles. Returns lower and upper bounds.
+	"""
+	import numpy as np
+
+	# Determine quartiles
+	q1 = np.percentile(array, 25, interpolation='midpoint')
+	q3 = np.percentile(array, 75, interpolation='midpoint')
+
+	# Determine interquartile range
+	iqr = q3 - q1
+
+	# Determine bounds
+	lower = q1 - 1.5 * iqr
+	upper = q3 + 1.5 * iqr
+	return lower, upper
+
 ################################################################################
 # General file reading and editing 
 
