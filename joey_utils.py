@@ -1908,6 +1908,18 @@ def find_sequence_in_pose_table(pose_table, sequence, instances=0):
 
 	return pose_table.iloc[selected_rows]
 
+
+def set_pose_name(pose, pose_name):
+	"""
+	Set the name of a pose in the PDB info to an input string. Necessary for 
+	outputting multiple poses as silent files. Names are by default the full
+	PDB name, including path, for poses loaded from files, or the first 8 
+	letters of the sequence for poses created from sequences.
+	"""
+	pose.pdb_info().name(pose_name)
+
+	return pose
+
 ################################################################################
 # Pose geometric evaluation functions (functions require PyRosetta)
 
