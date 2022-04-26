@@ -124,22 +124,56 @@ def split_string_at_numbers(string):
 ################################################################################
 # Protein-specific text functions
 
-def get_aa1_list():
+def get_aa1_list(mode='A'):
 	"""
 	Give a list of the 20 canonical amino acids in 1-letter form
+
+	Mode determines the order. 
+		A: alphabetical
+		C: by conservative AA type cluster (see is_conservative)
 	"""
-	return ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 
-		'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']
+	# Confirm acceptable mode choice
+	mode = mode.upper()
+	if mode not in ['A', 'C']:
+		raise ValueError('Mode options are "A" (alphabetical) or "C" (cluster)')
+
+	if mode == 'A':
+		return ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 
+			'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']
+
+	if mode == 'C':
+		return ['A', 'F', 'I', 'L', 'M', 'V', 'W', 'Y', 
+			'N', 'Q', 'S', 'T', 
+			'H', 'K', 'R', 
+			'D', 'E', 
+			'C', 'G', 'P']
 		
 
-def get_aa3_list():
+def get_aa3_list(mode='A'):
 	"""
 	Give a list of the 20 canonical amino acids in 3-letter form
+
+	Mode determines the order. 
+		A: alphabetical
+		C: by conservative AA type cluster (see is_conservative)
 	"""
-	return ['ALA', 'CYS', 'ASP', 'GLU', 'PHE', 
-		'GLY', 'HIS', 'ILE', 'LYS', 'LEU', 
-		'MET', 'ASN', 'PRO', 'GLN', 'ARG', 
-		'SER', 'THR', 'VAL', 'TRP', 'TYR']
+	# Confirm acceptable mode choice
+	mode = mode.upper()
+	if mode not in ['A', 'C']:
+		raise ValueError('Mode options are "A" (alphabetical) or "C" (cluster)')
+
+	if mode == 'A':
+		return ['ALA', 'CYS', 'ASP', 'GLU', 'PHE', 
+			'GLY', 'HIS', 'ILE', 'LYS', 'LEU', 
+			'MET', 'ASN', 'PRO', 'GLN', 'ARG', 
+			'SER', 'THR', 'VAL', 'TRP', 'TYR']
+
+	if mode == 'C':
+		return ['ALA', 'PHE', 'ILE', 'LEU', 'MET', 'VAL', 'TRP', 'TYR', 
+			'ANS', 'GLN', 'SER', 'THR', 
+			'HIS', 'LYS', 'ARG', 
+			'ASP', 'GLU', 
+			'CYS', 'GLY', 'PRO']
 		
 
 def get_aa_dict():
@@ -256,7 +290,7 @@ def is_conservative(wt_aa, mut_aa):
 					['C'],
 					['D', 'E'],
 					['G'], 
-					['H','K','R'],
+					['H', 'K', 'R'],
 					['N', 'Q', 'S', 'T'],
 					['P'],
 					['U']]
@@ -686,7 +720,7 @@ def delete_file(file_name):
 	""" Deletes a file """
 	from os import remove
 
-	os.remove(find_maybe_compressed_file(file_name))
+	remove(find_maybe_compressed_file(file_name))
 
 	return
 
