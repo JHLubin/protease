@@ -271,7 +271,9 @@ def main(args):
 
 		# Copy score summary
 		copyfile(report_name, report_name.replace(folder, outdir))
-
+		
+		print()
+		print(outdir)
 
 if __name__ == '__main__':
 	args = parse_args()
