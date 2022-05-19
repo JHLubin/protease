@@ -4,6 +4,7 @@ from glob import glob
 import json
 import os 
 from shutil import copyfile
+import joey_utils as ut
 
 def parse_args():
 	info = "Combines FASC files from PyRosetta job distributor and converts \
@@ -266,11 +267,10 @@ def main(args):
 		# Copy best decoys
 		for decoy in decoys_to_collect:
 			print(os.path.basename(decoy))
-			decoy_out = decoy.replace(folder, outdir)
-			copyfile(decoy, decoy_out)
+			ut.copy_file(decoy, ut.output_file_name(decoy, outdir))
 
 		# Copy score summary
-		copyfile(report_name, report_name.replace(folder, outdir))
+		ut.copy_file(report_name, ut.output_file_name(report_name, outdir))
 		
 		print()
 		print(outdir)
