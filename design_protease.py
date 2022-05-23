@@ -141,6 +141,7 @@ def init_opts(extra_opts, cst_file='ly104.cst', verbose=False):
 	""" Produces a list of init options for PyRosetta, including cst file """
 	ros_opts = '-ex1 -ex2  -use_input_sc -flip_HNQ'
 	ros_opts += ' -cst_fa_weight 1.0 -run:preserve_header'
+	ros_opts += ' -write_pdb_link_records false'
 
 	if not verbose:
 		ros_opts += ' -mute all'
