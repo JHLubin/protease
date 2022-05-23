@@ -3,7 +3,6 @@ import argparse
 from glob import glob
 import json
 import os 
-from shutil import copyfile
 import joey_utils as ut
 
 def parse_args():
