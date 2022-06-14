@@ -33,7 +33,7 @@ def parse_args():
 		help="Include sugars/glycans in the model.")
 	parser.add_argument('-sym', "--symmetry", default=None,
 		help="If the relax should be symmetric, specify the symdef file")
-	parser.add_argument('-cwt', "--constraint_weight", type=float, default=None,
+	parser.add_argument('-cwt', "--constraint_weight", type=float, default=1.0,
 		help="Specify the constraints weight for coordinates and enzdes \
 		(Default: 1.0)")
 	parser.add_argument("-nocons", "--no_constraints", action="store_true", 
