@@ -560,6 +560,34 @@ def interquartile_bounds(array):
 	upper = q3 + 1.5 * iqr
 	return lower, upper
 
+
+def get_distance(c1, c2):
+	""" 
+	Returns the distance between two XYZ coordinate vectors
+	"""
+	import numpy as np
+
+	return np.linalg.norm(np.array(c1) - np.array(c2))
+
+
+def calc_angle(c1, c2, c3):
+	"""
+	Calculate the angle between three points, about the middle point, c2
+
+	Returns value in degrees
+	"""
+	import numpy as np
+
+	# Get triangle legs
+	l1 = np.array(c1) - np.array(c2)
+	l2 = np.array(c3) - np.array(c2)
+
+	# Determine angle
+	cosine_angle = np.dot(l1, l2) / (np.linalg.norm(l1) * np.linalg.norm(l2))
+	angle = np.arccos(cosine_angle)
+
+	return np.degrees(angle)
+
 ################################################################################
 # General file reading and editing 
 
@@ -792,411 +820,6 @@ def output_file_name(filename, path='', extension='',
 	return join(pathname, outname)
 
 ################################################################################
-# PDB-specific file functions
-
-def collect_pdbs_list(target_dir, sort=True):
-	"""
-	Uses glob to collect all .pdb and .pdb.gz files in a directory. 
-	"""
-	from glob import glob
-	from os.path import join
-
-	all_pdbs = glob(join(target_dir, '*.pdb'))
-	all_pdbs += glob(join(target_dir, '*.pdb.gz'))
-	all_pdbs += glob(join(target_dir, '*.ent'))
-	all_pdbs += glob(join(target_dir, '*.ent.gz'))
-
-	if sort:
-		all_pdbs.sort()
-
-	return all_pdbs
-
-
-def fix_pdb(pdb, extension=None, clobber=False):
-	"""
-	Cleans up a PDB file, stripping out LINK lines and changing enzdes headers 
-	so that constraints won't crash. Overwrites the original with the cleaned 
-	version. An extension option may be given that will allow for the insertion 
-	of extra residues into a chain. This extension must be in the format of 
-	[chain_modified, modification_start, altered_length], ex ['A', 96, 5]
-	"""
-	# Unzip and open the PDB
-	pdb = find_maybe_compressed_file(pdb, unzip_file=True)
-	with open(pdb, 'r') as r:
-		lines = r.readlines()
-
-	# Collect lists of LINK lines, enzdes header lines, and range of atom lines
-	link_lines = []
-	enzdes_lines = []
-	first_atom = 0
-	last_atom = 0
-	for n, line in enumerate(lines):
-		# Link lines
-		if 'LINK' in line:
-			link_lines.append(n)
-
-		# Enzdes lined
-		if 'REMARK 666' in line:
-			enzdes_lines.append(n)
-
-		# Atom lines range
-		if 'ATOM' in line and first_atom == 0:
-			first_atom = n
-		if 'ATOM' in line and n > last_atom:
-			last_atom = n
-
-	# Remove LINK lines, which interfere with putting in constraints
-	for l2r in link_lines:
-		lines[l2r] = '\n'
-
-	# Fixing enzdes comments block so comments match (mutated) PDB sequence
-	for eline in enzdes_lines:
-		line_text = lines[eline]
-		# Splitting into columns. Columns 4-6 refer to the first residue, and 
-		# columns 9-11 refer to the second residue
-		e_columns = line_text.split()
-
-		# Checking whether enzdes constraint headers match sequence in PDB
-		for e_chain, e_aa, e_res in [e_columns[4:7], e_columns[9:12]]:
-			orig_text = ' '.join([e_chain, e_aa, e_res])
-
-			# Addressing extension
-			if extension:
-				ext_chain, ext_start, ext_len = extension
-				if e_chain == ext_chain and int(e_res) > ext_start:
-					e_res = str(int(e_res) + ext_len)
-					correct_text = ' '.join([e_chain, e_aa, e_res])
-					line_text = line_text.replace(orig_text, correct_text)
-
-			# Looping through all ATOM lines in the PDB until finding the 
-			# right residue, then checking agreement and stopping loop
-			for atom_line in lines[first_atom: last_atom]:
-				# Skip any line that isn't an atom line, such as a TER
-				if ('ATOM' not in atom_line):
-					continue
-
-				# Splitting into columns. Column 4 is the chain, column 5 is 
-				# the residue number, column 3 is the aa name
-				a_columns = atom_line.split()
-				a_aa, a_chain, a_res = a_columns[3:6]
-
-				# Skip until finding the right residue in the right chain
-				if (a_chain != e_chain) or (a_res != e_res):
-					continue
-
-				# If the enzdes header and PDB agree, stop there
-				if e_aa == a_aa:
-					break
-
-				# If the enzdes header and PDB disagree, correct the header
-				else:
-					correct_text = ' '.join([a_chain, a_aa, a_res])
-					line_text = line_text.replace(orig_text, correct_text)
-					break
-
-		# Setting header line with corrected text
-		lines[eline] = line_text
-		
-	# Saving corrected PDB
-	if clobber:
-		with open(pdb, 'w') as w:
-			w.writelines(lines)
-	else:
-		with open(pdb.replace('.pdb', '_corrected.pdb'), 'w') as w:
-			w.writelines(lines)
-
-	return
-
-
-def check_decoy_counts(decoy_dir, decoy_name_list, decoy_count):
-	"""
-	Given a list of base names and an expected decoy count, returns a list of 
-	names that didn't run at all and a dict of names with how many decoys short
-	of the expected count they are.
-	"""
-	from glob import glob 
-
-	# Initialize collection lists
-	pdbs_that_didnt_process = []
-	pdbs_missing_decoys = {}
-
-	# Iterate through decoy name list, checking decoy counts
-	for dec_name in decoy_name_list:
-		# Collet list of all decoys with the given base name
-		decoys = glob(output_file_name(dec_name, path=decoy_dir, 
-			extension='pdb', suffix='*'))
-
-		# If the list is empty, add to the didnt_process list
-		if len(decoys) == 0:
-			pdbs_that_didnt_process.append(dec_name)
-			continue
-
-		# If the list is incomplete, add to the missing_decoys dict
-		if len(decoys) != decoy_count:
-			missing_decs[dec_name] = decoy_count - len(decoys)
-
-
-	return pdbs_that_didnt_process, pdbs_missing_decoys
-
-################################################################################
-# PDB informatics functions
-
-def extract_pdb_atom_lines(pdb, het=False, enzdes=False, 
-	link=False, connect=False):
-	"""
-	Reads a PDB file and extracts the ATOM lines. By default, only ATOM lines 
-	are collected. However, if het is set to True, all HETATM lines will also be
-	collected. If het is a list of strings (case-sensitive), only the HETATM 
-	lines including those residue types will be collected with the ATOM lines.
-	If enzdes is True, REMARK 666 lines will also be collected. If link is True,
-	LINK lines will also be collected. If connect is True, CONNECT lines will 
-	also be collected.
-	"""
-	# Read in the PDB file
-	with open(pdb, 'r') as r:
-		pdb_lines = r.readlines()
-
-	# Go through lines, collecting only the 
-	pdb_extract = []
-	for line in pdb_lines:
-		# Collect ATOM lines
-		if line[:4] == 'ATOM':
-			pdb_extract.append(line)
-			continue
-
-		# Collect HETATM lines
-		if het:
-			if line[:6] == 'HETATM':
-				if not isinstance(het, list):
-					pdb_extract.append(line)
-					continue
-				else:
-					for atype in het:
-						if atype in line:
-							pdb_extract.append(line)
-							break
-
-		# Collect enzdes lines
-		if enzdes:
-			if line[:10] == 'REMARK 666':
-				pdb_extract.append(line)
-				continue
-
-		# Collect LINK lines
-		if link:
-			if line[:4] == 'LINK':
-				pdb_extract.append(line)
-				continue
-
-		# Collect enzdes lines
-		if connect:
-			if line[:6] == 'CONECT':
-				pdb_extract.append(line)
-				continue
-	return pdb_extract
-
-
-def tabulate_pdb_atom_lines(pdb, het=False):
-	"""
-	Generates a pandas dataframe from a PDB's ATOM lines. Can include HETATM as 
-	well.
-	"""
-	import pandas as pd
-
-	# Extract PDB ATOM/HETATM lines
-	atom_lines = extract_pdb_atom_lines(pdb, het=het)
-
-	# Define columns
-	pdb_atom_cols = {'type': (0, 4), 'atom_number': (6, 11), 
-		'atom_name': (12, 16), 'alt_location': (16, 17), 'res_name': (17, 20), 
-		'chain_id': (21,22), 'res_number': (22, 27), 'x': (30, 38), 
-		'y': (38, 46), 'z':(46,54), 'occupancy': (54, 60), 
-		'b-factor': (60, 66), 'segment': (72, 76), 'element': (76, 80)}
-
-	# Create data frame
-	atom_table = pd.DataFrame([])
-	for atom_line in atom_lines:
-		atom_dict = {}
-		for col, ind in pdb_atom_cols.items():
-			atom_dict[col] = atom_line[ind[0]:ind[1]].strip()
-		atom_table = atom_table.append(atom_dict, ignore_index=True)
-
-	# Convert columns from strings to numeric where appropriate
-	for col in ['atom_number', 'res_number']:
-		atom_table[col] = atom_table[col].astype(int, errors='ignore')
-	for col in ['x', 'y', 'z', 'b-factor', 'occupancy']:
-		atom_table[col] = atom_table[col].astype(float)
-
-	return atom_table
-
-
-def get_pdb_sequences(pdb_atom_table):
-	"""
-	Given a PDB atom table from tabulate_pdb_atom_lines, generates a dict of 
-	chains and their sequences
-	"""
-	# Extract CA-only table to read sequence
-	ca_table = pdb_atom_table[pdb_atom_table['atom_name'] == 'CA']
-
-	# Create dict of chains and sequences
-	chains_sequences = {}
-
-	# Iterate through all chains to collect sequences
-	for chain in ca_table['chain_id'].unique():
-		chain_ca_table = ca_table[ca_table['chain_id'] == chain]
-		sequence = ''.join(
-			[convert_aa_name(i) for i in chain_ca_table['res_name']])
-		chains_sequences[chain] = sequence
-	
-	return chains_sequences
-
-
-def find_aa_in_pdb_atom_table(atom_table, chain, pdb_number, aa1=True):
-	"""
-	From a PDB atom table like those generated by tabulate_pdb_atom_lines, find 
-	the amino acid name for the residue of specified chain and number. The aa1 
-	option will control whether the 1-letter (True) or 3-letter (False) name 
-	will be returned.
-	"""
-	# Isolate the CA of the desired residue
-	target_ca = atom_table[(atom_table['atom_name'] == 'CA') & 
-		(atom_table['chain_id'] == chain) & 
-		(atom_table['res_number'] == pdb_number)]
-
-	# Get the residue name
-	res_name = target_ca['res_name'].to_string(index=False).strip()
-
-	# Outpur the residue name in desired form
-	if aa1:
-		return convert_aa_name(res_name)
-	else:
-		return res_name
-
-
-def check_pdb_atom_table_contiguity(atom_table, min_res=1, max_res=0):
-	"""
-	PDB files may include missing residues or insertion residues (such as 
-	antibody CDR loops with redundant numbering). This function checks whether 
-	an atom table made by tabulate_pdb_atom_lines is missing residues or has 
-	insertions. Residues with lettered names (which don't convert to integers) 
-	are identified as insertions. Deletions are identified by finding gaps in a 
-	range, which by default goes from 1 to the max residue number of each chain, 
-	though the bounds can be set manually (min_res, max_res) or automatically 
-	identify the range of the chain (by setting the value to 0). Returns a dict 
-	of dicts. Outer: insertions, deletions; inner: a list for each chain.
-	"""
-	# Extract CA-only table to read sequence
-	ca_table = atom_table[atom_table['atom_name'] == 'CA']
-
-	# Initialize report dict
-	residue_indels = {i:{} for i in ['insertions', 'deletions']}
-
-	# Iterate through all chains to collect indels
-	for chain in ca_table['chain_id'].unique():
-		# Isolate single chain
-		chain_ca_table = ca_table[ca_table['chain_id'] == chain]
-
-		# List all residues
-		res_list = [str2int(i) for i in chain_ca_table['res_number']]
-
-		# Identify insertions
-		insertion_residues = [i for i in res_list if type(i) != int]
-		residue_indels['insertions'][chain] = insertion_residues
-
-		# Finding missing residues
-		res_list = [res for res in res_list if res not in insertion_residues]
-		## Determine chain min residue
-		chain_min = min_res
-		if min_res == 0:
-			chain_min =  min(res_list)
-		## Determine chain max residue
-		chain_max = max_res
-		if max_res == 0:
-			chain_max =  max(res_list)
-		## Check for gaps in residue number list
-		missing_res = [res for res in range(chain_min, chain_max + 1) 
-			if res not in res_list]
-		residue_indels['deletions'][chain] = missing_res
-
-	return residue_indels
-
-
-def atom_table_to_pdb(atom_table, pdb_name):
-	"""
-	Does the reverse operation of tabulate_pdb_atom_lines, converting a PDB atom
-	table back into a PDB with a specified pdb_name.
-	"""
-	# Create PDB line template string
-	pdb_line_string = '{:<4}  {:>5} {:^4}{:<1}{:<3} {:<1}{:^5}    '
-	pdb_line_string += '{:<8}{:<8}{:<8}{:^6}{:^6}      {:<4}{:<4}\n'
-
-	# Write formatted lines to the PDB file
-	with open(pdb_name, 'w') as w:
-		for ind, row in atom_table.iterrows():
-			w.write(pdb_line_string.format(*[str(i) for i in list(row)]))
-
-	return
-
-
-def extract_pdb_energy_lines(pdb):
-	"""
-	Finds and returns the lines from a PDB that include the pose energies	
-	"""
-	# Read the PDB
-	with open(pdb, 'r') as r:
-		pdb_lines = r.readlines()
-
-	# Identify endpoints of pose energies table
-	e_table_begin = None
-	e_table_end = None
-	for n, pdb_line in enumerate(pdb_lines):
-		if "BEGIN_POSE_ENERGIES_TABLE" in pdb_line:
-			e_table_begin = n + 1
-		if "END_POSE_ENERGIES_TABLE" in pdb_line:
-			e_table_end = n
-			break
-
-	return pdb_lines[e_table_begin: e_table_end]
-
-
-def tabulate_pdb_energy_lines(pdb):
-	"""
-	Generates a pandas dataframe from a PDB's Rosetta energy lines.
-	"""
-	import pandas as pd
-	import re
-
-	# Extract PDB Rosetta energy lines
-	energy_lines = extract_pdb_energy_lines(pdb)
-
-	# Create table
-	headers = energy_lines.pop(0).strip().split()
-	energy_table = pd.DataFrame(columns=headers)
-
-	# Populate the table converting line strings to series of floats
-	for eline in energy_lines:
-		line_energies = [str2float(i) for i in eline.strip().split()]
-		line_energies = pd. Series(line_energies, index=headers)
-		energy_table = energy_table.append(line_energies, ignore_index=True)
-    
-	# Create residue site and name columns from label
-	energy_table['pdb_number'] = energy_table.apply(
-		lambda row: str2int(re.split('\W+|_', row['label'])[-1]), 
-		axis='columns')
-	energy_table['residue'] = energy_table.apply(
-		lambda row: convert_aa_name(re.split('\W+|_', row['label'])[0], 
-		return_orig=True), axis='columns')
-    
-	# Reorder columns
-	cols = ['pdb_number', 'residue', 'total']
-	headers.remove('label')
-	headers.remove('total')
-	cols += headers
-	energy_table = energy_table[cols]
-
-	return energy_table
-
-################################################################################
 # Fasta functions (many functions require BioPython)
 
 def parse_fastafile(fasta_file):
@@ -1324,6 +947,50 @@ def display_alignment(alignment, width=80):
 		print(i)
 
 	return
+
+
+def tabulate_sequence_alignment(alignment):
+	"""
+	Input a biopython alignment to generate a pandas dataframe including the 
+	sequence numbers and letters at each position and an identity column.
+	"""
+	import pandas as pd
+
+	# Generate alignment string
+	alignment_string = generate_formatted_aligment(alignment, full=True)
+
+	# Split alignment string into sections representing different sequences
+	a_list = split_alignment_string(alignment_string)
+	s1, ident, s2 = a_list[:3]
+
+	# Create positions lists for both sequences
+	seq_positions = {}
+	for n, seq in enumerate([s1, s2]):
+		s_positions = []
+		s_val = 0
+		for i in list(seq):
+			if i == '-':
+				s_positions.append('')
+			else:
+				s_val += 1
+				s_positions.append(s_val)
+		seq_positions[n] = s_positions
+
+	# Create identity list
+	identities = []
+	for i in list(ident):
+		if i == '|':
+			identities.append(1)
+		else:
+			identities.append(0)
+	        
+	# Make table
+	return pd.DataFrame({
+		's1_position': seq_positions[0],
+		's1_sequence': list(s1),
+		's2_position': seq_positions[1],
+		's2_sequence': list(s2),
+		'identity': identities})
 
 
 def seq_to_seqrecord(seq, seqrecord):
@@ -1527,6 +1194,409 @@ def compare_sequences(seq1, seq2, first_res=1, repair=False, only_difs=False,
 					axis='columns')
 	
 	return aligned_table
+
+################################################################################
+# PDB informatics functions
+
+def collect_pdbs_list(target_dir, sort=True):
+	"""
+	Uses glob to collect all .pdb and .pdb.gz files in a directory. 
+	"""
+	from glob import glob
+	from os.path import join
+
+	all_pdbs = glob(join(target_dir, '*.pdb'))
+	all_pdbs += glob(join(target_dir, '*.pdb.gz'))
+	all_pdbs += glob(join(target_dir, '*.ent'))
+	all_pdbs += glob(join(target_dir, '*.ent.gz'))
+
+	if sort:
+		all_pdbs.sort()
+
+	return all_pdbs
+
+
+def check_decoy_counts(decoy_dir, decoy_name_list, decoy_count):
+	"""
+	Given a list of base names and an expected decoy count, returns a list of 
+	names that didn't run at all and a dict of names with how many decoys short
+	of the expected count they are.
+	"""
+	from glob import glob 
+
+	# Initialize collection lists
+	pdbs_that_didnt_process = []
+	pdbs_missing_decoys = {}
+
+	# Iterate through decoy name list, checking decoy counts
+	for dec_name in decoy_name_list:
+		# Collet list of all decoys with the given base name
+		decoys = glob(output_file_name(dec_name, path=decoy_dir, 
+			extension='pdb', suffix='*'))
+
+		# If the list is empty, add to the didnt_process list
+		if len(decoys) == 0:
+			pdbs_that_didnt_process.append(dec_name)
+			continue
+
+		# If the list is incomplete, add to the missing_decoys dict
+		if len(decoys) != decoy_count:
+			missing_decs[dec_name] = decoy_count - len(decoys)
+
+
+	return pdbs_that_didnt_process, pdbs_missing_decoys
+
+
+def fix_pdb(pdb, extension=None, clobber=False):
+	"""
+	Cleans up a PDB file, stripping out LINK lines and changing enzdes headers 
+	so that constraints won't crash. Overwrites the original with the cleaned 
+	version. An extension option may be given that will allow for the insertion 
+	of extra residues into a chain. This extension must be in the format of 
+	[chain_modified, modification_start, altered_length], ex ['A', 96, 5]
+	"""
+	# Unzip and open the PDB
+	pdb = find_maybe_compressed_file(pdb, unzip_file=True)
+	with open(pdb, 'r') as r:
+		lines = r.readlines()
+
+	# Collect lists of LINK lines, enzdes header lines, and range of atom lines
+	link_lines = []
+	enzdes_lines = []
+	first_atom = 0
+	last_atom = 0
+	for n, line in enumerate(lines):
+		# Link lines
+		if 'LINK' in line:
+			link_lines.append(n)
+
+		# Enzdes lined
+		if 'REMARK 666' in line:
+			enzdes_lines.append(n)
+
+		# Atom lines range
+		if 'ATOM' in line and first_atom == 0:
+			first_atom = n
+		if 'ATOM' in line and n > last_atom:
+			last_atom = n
+
+	# Remove LINK lines, which interfere with putting in constraints
+	for l2r in link_lines:
+		lines[l2r] = '\n'
+
+	# Fixing enzdes comments block so comments match (mutated) PDB sequence
+	for eline in enzdes_lines:
+		line_text = lines[eline]
+		# Splitting into columns. Columns 4-6 refer to the first residue, and 
+		# columns 9-11 refer to the second residue
+		e_columns = line_text.split()
+
+		# Checking whether enzdes constraint headers match sequence in PDB
+		for e_chain, e_aa, e_res in [e_columns[4:7], e_columns[9:12]]:
+			orig_text = ' '.join([e_chain, e_aa, e_res])
+
+			# Addressing extension
+			if extension:
+				ext_chain, ext_start, ext_len = extension
+				if e_chain == ext_chain and int(e_res) > ext_start:
+					e_res = str(int(e_res) + ext_len)
+					correct_text = ' '.join([e_chain, e_aa, e_res])
+					line_text = line_text.replace(orig_text, correct_text)
+
+			# Looping through all ATOM lines in the PDB until finding the 
+			# right residue, then checking agreement and stopping loop
+			for atom_line in lines[first_atom: last_atom]:
+				# Skip any line that isn't an atom line, such as a TER
+				if ('ATOM' not in atom_line):
+					continue
+
+				# Splitting into columns. Column 4 is the chain, column 5 is 
+				# the residue number, column 3 is the aa name
+				a_columns = atom_line.split()
+				a_aa, a_chain, a_res = a_columns[3:6]
+
+				# Skip until finding the right residue in the right chain
+				if (a_chain != e_chain) or (a_res != e_res):
+					continue
+
+				# If the enzdes header and PDB agree, stop there
+				if e_aa == a_aa:
+					break
+
+				# If the enzdes header and PDB disagree, correct the header
+				else:
+					correct_text = ' '.join([a_chain, a_aa, a_res])
+					line_text = line_text.replace(orig_text, correct_text)
+					break
+
+		# Setting header line with corrected text
+		lines[eline] = line_text
+		
+	# Saving corrected PDB
+	if clobber:
+		with open(pdb, 'w') as w:
+			w.writelines(lines)
+	else:
+		with open(pdb.replace('.pdb', '_corrected.pdb'), 'w') as w:
+			w.writelines(lines)
+
+	return
+
+
+def extract_pdb_atom_lines(pdb, het=False, enzdes=False, 
+	link=False, connect=False):
+	"""
+	Reads a PDB file and extracts the ATOM lines. By default, only ATOM lines 
+	are collected. However, if het is set to True, all HETATM lines will also be
+	collected. If het is a list of strings (case-sensitive), only the HETATM 
+	lines including those residue types will be collected with the ATOM lines.
+	If enzdes is True, REMARK 666 lines will also be collected. If link is True,
+	LINK lines will also be collected. If connect is True, CONNECT lines will 
+	also be collected.
+	"""
+	# Read in the PDB file
+	with open(pdb, 'r') as r:
+		pdb_lines = r.readlines()
+
+	# Go through lines, collecting only the 
+	pdb_extract = []
+	for line in pdb_lines:
+		# Collect ATOM lines
+		if line[:4] == 'ATOM':
+			pdb_extract.append(line)
+			continue
+
+		# Collect HETATM lines
+		if het:
+			if line[:6] == 'HETATM':
+				if not isinstance(het, list):
+					pdb_extract.append(line)
+					continue
+				else:
+					for atype in het:
+						if atype in line:
+							pdb_extract.append(line)
+							break
+
+		# Collect enzdes lines
+		if enzdes:
+			if line[:10] == 'REMARK 666':
+				pdb_extract.append(line)
+				continue
+
+		# Collect LINK lines
+		if link:
+			if line[:4] == 'LINK':
+				pdb_extract.append(line)
+				continue
+
+		# Collect enzdes lines
+		if connect:
+			if line[:6] == 'CONECT':
+				pdb_extract.append(line)
+				continue
+	return pdb_extract
+
+
+def tabulate_pdb_atom_lines(pdb, het=False):
+	"""
+	Generates a pandas dataframe from a PDB's ATOM lines. Can include HETATM as 
+	well.
+	"""
+	import pandas as pd
+
+	# Extract PDB ATOM/HETATM lines
+	atom_lines = extract_pdb_atom_lines(pdb, het=het)
+
+	# Define columns
+	pdb_atom_cols = {'type': (0, 6), 'atom_number': (6, 11), 
+		'atom_name': (12, 16), 'alt_location': (16, 17), 'res_name': (17, 20), 
+		'chain_id': (21,22), 'res_number': (22, 27), 'x': (30, 38), 
+		'y': (38, 46), 'z':(46,54), 'occupancy': (54, 60), 
+		'b-factor': (60, 66), 'segment': (72, 76), 'element': (76, 80)}
+
+	# Create data frame
+	atom_table = pd.DataFrame([])
+	for atom_line in atom_lines:
+		atom_dict = {}
+		for col, ind in pdb_atom_cols.items():
+			atom_dict[col] = atom_line[ind[0]:ind[1]].strip()
+		atom_table = atom_table.append(atom_dict, ignore_index=True)
+
+	# Convert columns from strings to numeric where appropriate
+	for col in ['atom_number', 'res_number']:
+		atom_table[col] = atom_table[col].astype(int, errors='ignore')
+	for col in ['x', 'y', 'z', 'b-factor', 'occupancy']:
+		atom_table[col] = atom_table[col].astype(float)
+
+	return atom_table
+
+
+def get_pdb_sequences(pdb_atom_table):
+	"""
+	Given a PDB atom table from tabulate_pdb_atom_lines, generates a dict of 
+	chains and their sequences
+	"""
+	# Extract CA-only table to read sequence
+	ca_table = pdb_atom_table[pdb_atom_table['atom_name'] == 'CA']
+
+	# Create dict of chains and sequences
+	chains_sequences = {}
+
+	# Iterate through all chains to collect sequences
+	for chain in ca_table['chain_id'].unique():
+		chain_ca_table = ca_table[ca_table['chain_id'] == chain]
+		sequence = ''.join(
+			[convert_aa_name(i) for i in chain_ca_table['res_name']])
+		chains_sequences[chain] = sequence
+	
+	return chains_sequences
+
+
+def find_aa_in_pdb_atom_table(atom_table, chain, pdb_number, aa1=True):
+	"""
+	From a PDB atom table like those generated by tabulate_pdb_atom_lines, find 
+	the amino acid name for the residue of specified chain and number. The aa1 
+	option will control whether the 1-letter (True) or 3-letter (False) name 
+	will be returned.
+	"""
+	# Isolate the CA of the desired residue
+	target_ca = atom_table[(atom_table['atom_name'] == 'CA') & 
+		(atom_table['chain_id'] == chain) & 
+		(atom_table['res_number'] == pdb_number)]
+
+	# Get the residue name
+	res_name = target_ca['res_name'].to_string(index=False).strip()
+
+	# Outpur the residue name in desired form
+	if aa1:
+		return convert_aa_name(res_name)
+	else:
+		return res_name
+
+
+def check_pdb_atom_table_contiguity(atom_table, min_res=1, max_res=0):
+	"""
+	PDB files may include missing residues or insertion residues (such as 
+	antibody CDR loops with redundant numbering). This function checks whether 
+	an atom table made by tabulate_pdb_atom_lines is missing residues or has 
+	insertions. Residues with lettered names (which don't convert to integers) 
+	are identified as insertions. Deletions are identified by finding gaps in a 
+	range, which by default goes from 1 to the max residue number of each chain, 
+	though the bounds can be set manually (min_res, max_res) or automatically 
+	identify the range of the chain (by setting the value to 0). Returns a dict 
+	of dicts. Outer: insertions, deletions; inner: a list for each chain.
+	"""
+	# Extract CA-only table to read sequence
+	ca_table = atom_table[atom_table['atom_name'] == 'CA']
+
+	# Initialize report dict
+	residue_indels = {i:{} for i in ['insertions', 'deletions']}
+
+	# Iterate through all chains to collect indels
+	for chain in ca_table['chain_id'].unique():
+		# Isolate single chain
+		chain_ca_table = ca_table[ca_table['chain_id'] == chain]
+
+		# List all residues
+		res_list = [str2int(i) for i in chain_ca_table['res_number']]
+
+		# Identify insertions
+		insertion_residues = [i for i in res_list if type(i) != int]
+		residue_indels['insertions'][chain] = insertion_residues
+
+		# Finding missing residues
+		res_list = [res for res in res_list if res not in insertion_residues]
+		## Determine chain min residue
+		chain_min = min_res
+		if min_res == 0:
+			chain_min =  min(res_list)
+		## Determine chain max residue
+		chain_max = max_res
+		if max_res == 0:
+			chain_max =  max(res_list)
+		## Check for gaps in residue number list
+		missing_res = [res for res in range(chain_min, chain_max + 1) 
+			if res not in res_list]
+		residue_indels['deletions'][chain] = missing_res
+
+	return residue_indels
+
+
+def atom_table_to_pdb(atom_table, pdb_name):
+	"""
+	Does the reverse operation of tabulate_pdb_atom_lines, converting a PDB atom
+	table back into a PDB with a specified pdb_name.
+	"""
+	# Create PDB line template string
+	pdb_line_string = '{:<6}{:>5} {:^4}{:<1}{:<3} {:<1}{:^5}    '
+	pdb_line_string += '{:<8}{:<8}{:<8}{:^6}{:^6}      {:<4}{:<4}\n'
+
+	# Write formatted lines to the PDB file
+	with open(pdb_name, 'w') as w:
+		for ind, row in atom_table.iterrows():
+			w.write(pdb_line_string.format(*[str(i) for i in list(row)]))
+
+	return
+
+
+def extract_pdb_energy_lines(pdb):
+	"""
+	Finds and returns the lines from a PDB that include the pose energies	
+	"""
+	# Read the PDB
+	with open(pdb, 'r') as r:
+		pdb_lines = r.readlines()
+
+	# Identify endpoints of pose energies table
+	e_table_begin = None
+	e_table_end = None
+	for n, pdb_line in enumerate(pdb_lines):
+		if "BEGIN_POSE_ENERGIES_TABLE" in pdb_line:
+			e_table_begin = n + 1
+		if "END_POSE_ENERGIES_TABLE" in pdb_line:
+			e_table_end = n
+			break
+
+	return pdb_lines[e_table_begin: e_table_end]
+
+
+def tabulate_pdb_energy_lines(pdb):
+	"""
+	Generates a pandas dataframe from a PDB's Rosetta energy lines.
+	"""
+	import pandas as pd
+	import re
+
+	# Extract PDB Rosetta energy lines
+	energy_lines = extract_pdb_energy_lines(pdb)
+
+	# Create table
+	headers = energy_lines.pop(0).strip().split()
+	energy_table = pd.DataFrame(columns=headers)
+
+	# Populate the table converting line strings to series of floats
+	for eline in energy_lines:
+		line_energies = [str2float(i) for i in eline.strip().split()]
+		line_energies = pd. Series(line_energies, index=headers)
+		energy_table = energy_table.append(line_energies, ignore_index=True)
+    
+	# Create residue site and name columns from label
+	energy_table['pose_number'] = energy_table.apply(
+		lambda row: str2int(re.split('\W+|_', row['label'])[-1]), 
+		axis='columns')
+	energy_table['residue'] = energy_table.apply(
+		lambda row: convert_aa_name(re.split('\W+|_', row['label'])[0], 
+		return_orig=True), axis='columns')
+    
+	# Reorder columns
+	cols = ['pose_number', 'residue', 'total']
+	headers.remove('label')
+	headers.remove('total')
+	cols += headers
+	energy_table = energy_table[cols]
+
+	return energy_table
 
 ################################################################################
 # Pose setup functions (functions require PyRosetta)
@@ -1965,15 +2035,6 @@ def set_pose_name(pose, pose_name):
 
 ################################################################################
 # Pose geometric evaluation functions (functions require PyRosetta)
-
-def get_distance(c1, c2):
-	""" 
-	Returns the distance between two Rosetta XYZ coordinate vectors
-	"""
-	import numpy as np
-
-	return np.linalg.norm(np.array(c1) - np.array(c2))
-
 
 def check_pose_continuity(pose):
 	"""
@@ -3064,8 +3125,8 @@ def apply_distance_constraints(pose, residue_1, atom_1, residue_2, atom_2,
 	from pyrosetta.rosetta.core.scoring.func import HarmonicFunc
 
 	# Determine atoms to constrain
-	a1 = find_res_atom(pose, residue_1, atom_type=atom_1)
-	a2 = find_res_atom(pose, residue_2, atom_type=atom_2)
+	a1 = find_atom_id(pose, residue_1, atom_type=atom_1)
+	a2 = find_atom_id(pose, residue_2, atom_type=atom_2)
 
 	# Adjust distance if current distance is desired
 	if distance == 0:
