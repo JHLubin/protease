@@ -561,7 +561,7 @@ def interquartile_bounds(array):
 	return lower, upper
 
 
-def get_distance(c1, c2):
+def calc_distance(c1, c2):
 	""" 
 	Returns the distance between two XYZ coordinate vectors
 	"""
@@ -2061,7 +2061,7 @@ def check_pose_continuity(pose):
 	c_n_distances = []
 	break_sites = []
 	for i in range(len(n_coords) - 1):
-		distance = get_distance(c_coords[i], n_coords[i+1])
+		distance = calc_distance(c_coords[i], n_coords[i+1])
 		c_n_distances.append(distance)
 
 	# Check whether distance indicates a chain break
@@ -3138,7 +3138,7 @@ def apply_distance_constraints(pose, residue_1, atom_1, residue_2, atom_2,
 
 	# Adjust distance if current distance is desired
 	if distance == 0:
-		distance = get_distance(a1, a2)
+		distance = calc_distance(a1, a2)
 
 	# Create harmonic score function with specified distance and sd
 	harm_func = HarmonicFunc(distance, sd)
