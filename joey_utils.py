@@ -952,7 +952,8 @@ def display_alignment(alignment, width=80):
 def tabulate_sequence_alignment(alignment):
 	"""
 	Input a biopython alignment to generate a pandas dataframe including the 
-	sequence numbers and letters at each position and an identity column.
+	sequence numbers and letters at each position and identity and alignment 
+	columns, denoted by integers.
 	"""
 	import pandas as pd
 
@@ -985,12 +986,19 @@ def tabulate_sequence_alignment(alignment):
 			identities.append(0)
 	        
 	# Make table
-	return pd.DataFrame({
+	align_df = pd.DataFrame({
 		's1_position': seq_positions[0],
 		's1_sequence': list(s1),
 		's2_position': seq_positions[1],
 		's2_sequence': list(s2),
 		'identity': identities})
+
+	# Add column to check whether residues are aligned 
+	align_df['aligned'] = align_df.apply(lambda row: int(
+		isinstance(row['s1_position'], int) and 
+		isinstance(row['s2_position'], int)), axis='columns')
+
+	return align_df
 
 
 def seq_to_seqrecord(seq, seqrecord):
