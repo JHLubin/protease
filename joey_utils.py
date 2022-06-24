@@ -588,6 +588,24 @@ def calc_angle(c1, c2, c3):
 
 	return np.degrees(angle)
 
+
+def calc_dihedral(c1, c2, c3, c4):
+	"""
+	Calculate the dihedral/torsion angle between four points
+
+	Returns value in degrees
+	"""
+	import numpy as np
+
+	# Get dihedral vectors
+    v1 = np.array(c1) - np.array(c2)
+    v2 = np.array(c2) - np.array(c3)
+    v3 = np.array(c3) - np.array(c4)
+
+    # 
+
+
+
 ################################################################################
 # General file reading and editing 
 
@@ -2628,6 +2646,7 @@ def secstruct_selector(ss, minE=3, minH=4):
 		SecondaryStructureSelector
 
 	# Check correct input
+	ss = ss.upper()
 	for ss_type in ss:
 		if ss_type not in ['E', 'H', 'L']:
 			raise ValueError('{} is not a secondary structure. Secondary \
