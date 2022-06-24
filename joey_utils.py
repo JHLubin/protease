@@ -2679,7 +2679,7 @@ def layer_selector(layer):
 	layer = layer.upper()
 
 	# Create selector
-	layer_selector = LayerSelector()
+	layr_selector = LayerSelector()
 
 	# Determine layer(s) to select
 	select_core = 0
@@ -2690,9 +2690,9 @@ def layer_selector(layer):
 	if 'S' in layer: select_surface = 1
 
 	# Set layer selection
-	layer_selector.set_layers(select_core, select_boundary, select_surface)
+	layr_selector.set_layers(select_core, select_boundary, select_surface)
 
-	return layer_selector
+	return layr_selector
 
 
 def hbond_selector(selection, include_sc=True, include_bb_bb=True):
