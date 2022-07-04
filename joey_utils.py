@@ -598,9 +598,9 @@ def calc_dihedral(c1, c2, c3, c4):
 	import numpy as np
 
 	# Get dihedral vectors
-    v1 = np.array(c1) - np.array(c2)
-    v2 = np.array(c2) - np.array(c3)
-    v3 = np.array(c3) - np.array(c4)
+	v1 = np.array(c1) - np.array(c2)
+	v2 = np.array(c2) - np.array(c3)
+	v3 = np.array(c3) - np.array(c4)
 
     # 
 
@@ -1637,7 +1637,8 @@ def pyrosetta_init(verbose=False, preserve_header=False, no_link=False, sugars=F
 		preserve_header (default=False) will preserve PDB headers if True
 		sugars (default=False) will add a number of flags recommended by Labonte
 		no_link (default=False) will prevent adding LINK lines to output PDBs
-		ligands (default=None) will add a list of extra_res_fa params files
+		ligands (default=None) will add a single string or list of extra_res_fa 
+			params files 
 		extra_opts (default=None) will add a list of other arguments given as 
 			strings. Do not include dashes; they will be added automatically.
 		init (default=True) will initialize PyRosetta with the given options.
@@ -1664,6 +1665,8 @@ def pyrosetta_init(verbose=False, preserve_header=False, no_link=False, sugars=F
 	if isinstance(ligands, list):
 		for l in ligands:
 			ros_opts.append('extra_res_fa {}'.format(l))
+	if isinstance(ligands, str):
+		ros_opts.append('extra_res_fa {}'.format(ligands))
 	if extra_opts:
 		for i in extra_opts:
 			ros_opts.append(i)
