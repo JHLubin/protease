@@ -2744,7 +2744,10 @@ def not_selector(selection):
 	from pyrosetta.rosetta.core.select.residue_selector import \
 		NotResidueSelector
 
-	return NotResidueSelector(selection)
+	nrs = NotResidueSelector()
+	nrs.set_residue_selector(selection)
+
+	return nrs
 
 
 def selector_intersection(*selectors):
