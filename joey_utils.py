@@ -2713,22 +2713,21 @@ def hbond_selector(selection, include_sc=True, include_bb_bb=True):
 	# Initialize selector
 	hbs = HBondSelector()
 	hbs.set_input_set_selector(selection)
-	hbs.set_include_bb_bb(False)
 
 	# Include both
 	if include_sc & include_bb_bb:
-		hbs.set_include_bb_bb(True)
 		return hbs
 
 	# Exclude bb-bb bonding residues
 	elif include_sc:
+		hbs.set_include_bb_bb(False)
 		return hbs
 
 	# Select only bb-bb residues
 	elif include_bb_bb:
 		# Since selector doesn't allow bb-only, subtract two selectors
-		hb_with_bb = hbs.clone()
-		hb_with_bb.set_include_bb_bb(True)
+		hb_with_bb = HBondSelector()
+		hb_with_bb.set_input_set_selector(selection)
 		no_sc = not_selector(hbs)
 		return selector_intersection(hb_with_bb, no_sc)
 
@@ -3171,7 +3170,7 @@ def apply_distance_constraints(pose, residue_1, atom_1, residue_2, atom_2,
 	# Add the constraint to the pose
 	pose.add_constraint(distance_constraint)
 
-	return
+	return pose
 
 
 def apply_dihedral_constraint(pose, residue, dihedral, angle, sd=5):
@@ -3203,7 +3202,7 @@ def apply_dihedral_constraint(pose, residue, dihedral, angle, sd=5):
 	# Add the constraint to the pose
 	pose.add_constraint(dihedral_constraint)
 
-	return
+	return pose
 
 
 def constrain_current_backbone_dihedrals(pose, selection, sd=5):
@@ -3228,7 +3227,7 @@ def constrain_current_backbone_dihedrals(pose, selection, sd=5):
 		current_psi = pose.psi(res)
 		apply_dihedral_constraint(pose, res, 'psi', current_psi, sd=sd)
 
-	return
+	return pose
 
 ################################################################################
 # Mover functions (functions require PyRosetta)
