@@ -531,6 +531,7 @@ def get_score_function(ref15=True, constraints=True, hbnet=False):
 		sf.set_weight(ScoreType.coordinate_constraint, 1)
 		sf.set_weight(ScoreType.angle_constraint, 1)
 		sf.set_weight(ScoreType.dihedral_constraint, 1)
+		sf.set_weight(ScoreType.res_type_constraint, 1)
 
 	# Optionally adding in hbnet
 	if hbnet:
