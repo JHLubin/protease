@@ -1,10 +1,6 @@
 import argparse
 import joey_utils as ut
-from os.path import join
 import pandas as pd
-import pyrosetta as pr
-from pyrosetta.rosetta.core.select.residue_selector import ChainSelector, \
-	ResidueIndexSelector
 
 def parse_args():
 	info = """
@@ -56,7 +52,7 @@ def tabulate_per_residue_interactions(pose, scorefunction, cluster,
 	energies between a given residue and all residues across the interface.
 	"""
 	# Copy and score pose
-	score_pose = pr.Pose(pose)
+	score_pose = ut.pose_copy(pose)
 	scorefunction(score_pose)
 
 	# Make table for energies from pose
@@ -81,13 +77,13 @@ def tabulate_per_residue_interactions(pose, scorefunction, cluster,
 		target_res = row['pose_number']
 
 		# Make selector for single residue
-		target_res_selection = ResidueIndexSelector(target_res)
+		target_res_selection = ut.index_selector(target_res)
 
 		# Make selector for interface chain
 		if row['pdb_chain'] in main_chain:
-			interface_chain = ChainSelector(','.join(main_chain))
+			interface_chain = ut.chain_selector(','.join(main_chain))
 		elif row['pdb_chain'] in substrate_chain:
-			interface_chain = ChainSelector(','.join(substrate_chain))
+			interface_chain = ut.chain_selector(','.join(substrate_chain))
 		else:
 			print('Main chain:', main_chain)
 			print('Substrate chain:', substrate_chain)
@@ -147,16 +143,11 @@ def main(args):
 		per_res_table = per_res_table.append(p_table, ignore_index=True)
 		
 	# Set output name
-	od = ut.out_directory(args.out_dir)
-	out_name = 'interface_energies'
-	if args.name_prefix:
-		out_name = '_'.join([args.name_prefix, out_name])
-	if args.name_suffix:
-		out_name = '_'.join([out_name, args.name_suffix])
+	out_name = ut.output_file_name('interface_energies', path=args.out_dir, 
+		extension='csv', prefix=args.name_prefix, suffix=args.name_suffix)
 	if args.parallel_partition != [1, 1]:
-		out_name += '_{}_of_{}'.format(*args.parallel_partition[::-1])
-	out_name += '.csv'
-	out_name = join(od, out_name)
+		out_ext = '_{}_of_{}'.format(*args.parallel_partition[::-1])
+		out_name = ut.output_file_name(out_name, suffix=out_ext)
 
 	# Output CSV
 	per_res_table.to_csv(out_name, index=False)
@@ -164,5 +155,5 @@ def main(args):
 
 if __name__ == '__main__':
 	args = parse_args()
-	pr.init('-run:preserve_header')
+	ut.pyrosetta_init(preserve_header=True)
 	main(args)
