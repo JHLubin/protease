@@ -1159,12 +1159,12 @@ def write_fastafile(sequence_records, write_file):
 def compare_sequences(seq1, seq2, first_res=1, repair=False, only_difs=False,
 	make_subs_column=False):
 	"""
-	Given a two sequence strings that this function assumes are similar, 
-	produces an aligned table from from which it is easy to identify the sites 
-	where the second sequence differs from the first, or where residues were 
-	sequenced badly (X). Returns a dataframe of sites. The columns in the 
-	dataframe are the seq_1 letter, the seq_2 letter, with the row index 
-	matching the first sequence. 
+	Given two sequence strings that this function assumes are similar, produces 
+	an aligned table from from which it is easy to identify the sites where the 
+	second sequence differs from the first, or where residues were sequenced 
+	badly (X). Returns a dataframe of sites. The columns in the dataframe are 
+	the seq_1 letter, the seq_2 letter, with the row index matching the first 
+	sequence. 
 
 	The first letter in the first seqence is assumed to be residue 1 by default, 
 	but chan be changed with the first_res option. 
@@ -1746,6 +1746,17 @@ def load_pose(pdb, path=None, enzdes_cst=None, coord_cst=False, res_type_cst=0,
 		pose = apply_membrane(pose, membrane, symmetric=symmetry)
 	
 	return pose
+
+
+def pose_copy(pose):
+	""" Returns a copy of a pose """
+	import pyrosetta as pr
+
+	copied_pose = pr.Pose()
+	copied_pose.assign(pose)
+
+	return copied_pose
+
 
 ################################################################################
 # Pose informatics functions (functions require PyRosetta)
