@@ -1757,7 +1757,6 @@ def pose_copy(pose):
 
 	return copied_pose
 
-
 ################################################################################
 # Pose informatics functions (functions require PyRosetta)
 
@@ -1808,6 +1807,23 @@ def get_pose_chain_list(pose):
 		pose_chains.append(pose.pdb_info().chain(pose.chain_begin(chain)))
 
 	return pose_chains
+
+
+def get_pose_sequence(pose, selection=None):
+	""" 
+	Determine the sequence of a pose. Providing a selector will return only the 
+	sequence of the selection.
+	"""
+    from pyrosetta.rosetta.core.simple_metrics.metrics import SequenceMetric
+    
+    # Create sequence metric
+    seqm = SequenceMetric()
+    
+    # Add the selector
+    if selection:
+        seqm.set_residue_selector(selection)
+    
+    return seqm.calculate(pose)
 
 
 def find_res_aa(pose, residue, name_length=1):
