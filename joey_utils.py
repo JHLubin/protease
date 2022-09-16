@@ -1,5 +1,5 @@
 ################################################################################
-# Text functions
+# General text functions
 
 def str2bool(v):
 	""" Converts a number of potential string inputs to boolean """
@@ -974,6 +974,7 @@ def tabulate_sequence_alignment(alignment):
 	columns, denoted by integers.
 	"""
 	import pandas as pd
+	import numpy as np
 
 	# Generate alignment string
 	alignment_string = generate_formatted_aligment(alignment, full=True)
@@ -989,7 +990,7 @@ def tabulate_sequence_alignment(alignment):
 		s_val = 0
 		for i in list(seq):
 			if i == '-':
-				s_positions.append('')
+				s_positions.append(np.nan)
 			else:
 				s_val += 1
 				s_positions.append(s_val)
@@ -2132,7 +2133,8 @@ def identify_res_layer(pose, res_number, target_chain=None):
 
 	# If the pose has multiple chains and one is desired, isolate it
 	if target_chain:
-		check_pose = Pose(pose, pose.chain_begin(main_chain), pose.chain_end(main_chain))
+		check_pose = Pose(pose, pose.chain_begin(target_chain), 
+            pose.chain_end(target_chain))
 	else:
 		check_pose = pose
 	
@@ -2845,7 +2847,6 @@ def selector_to_pymol(pose, selector, selection_name):
 	pymol_command = pymol_command.replace('rosetta_sele', selection_name)
 
 	return pymol_command
-
 
 ################################################################################
 # Scoring functions (functions require PyRosetta)
