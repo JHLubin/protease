@@ -1875,26 +1875,30 @@ def find_dihedral_atom_ids(pose, resnum, dihedral):
 	# Confirm acceptable angle selection
 	assert dihedral in ['phi', 'psi', 'omega']
 
-	# Populate list of relevant backbone atoms near dihedrals
+	# Populate list of relevant backbone atoms near dihedral
 	bb_atomids = []
-	for atom in ['C']:
-		bb_atomids.append(find_atom_id(pose, resnum - 1, atom))
-	for atom in ['N', 'CA', 'C']:
-		bb_atomids.append(find_atom_id(pose, resnum, atom))
-	for atom in ['N', 'CA']:
-		bb_atomids.append(find_atom_id(pose, resnum + 1, atom))
-
-	# Phi angle
+	## Phi angle
 	if dihedral == 'phi':
-		return bb_atomids[:-2]
+        for atom in ['C']:
+            bb_atomids.append(find_atom_id(pose, resnum - 1, atom))
+        for atom in ['N', 'CA', 'C']:
+            bb_atomids.append(find_atom_id(pose, resnum, atom))
 
-	# Psi angle
+	## Psi angle
 	if dihedral == 'psi':
-		return bb_atomids[1:-1]
+        for atom in ['N', 'CA', 'C']:
+            bb_atomids.append(find_atom_id(pose, resnum, atom))
+        for atom in ['N']:
+            bb_atomids.append(find_atom_id(pose, resnum + 1, atom))
 
-	# Omega angle
+	## Omega angle
 	if dihedral == 'omega':
-		return bb_atomids[2:]
+        for atom in ['CA', 'C']:
+            bb_atomids.append(find_atom_id(pose, resnum, atom))
+        for atom in ['N', 'CA']:
+            bb_atomids.append(find_atom_id(pose, resnum + 1, atom))
+
+    return bb_atomids
 
 
 def find_atom_coords(pose, resnum, atom_type='CA'):
