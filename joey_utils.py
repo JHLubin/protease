@@ -591,7 +591,7 @@ def calc_angle(c1, c2, c3):
 
 def calc_dihedral(c1, c2, c3, c4):
 	"""
-	Calculate the dihedral/torsion angle between four points
+	Calculate the dihedral/torsion angle between four points, between c2 and c3
 
 	Returns value in degrees
 	"""
@@ -599,12 +599,23 @@ def calc_dihedral(c1, c2, c3, c4):
 
 	# Get dihedral vectors
 	v1 = np.array(c1) - np.array(c2)
-	v2 = np.array(c2) - np.array(c3)
-	v3 = np.array(c3) - np.array(c4)
+	v2 = np.array(c3) - np.array(c2)
+	v3 = np.array(c4) - np.array(c3)
 
-    # 
+	# Normalize v2 magnitude
+	v2 /= np.linalg.norm(v2)
 
+	# Vector Projections
+	## p1 = projection of v1 onto plane perpendicular to v2
+	## p2 = projection of v3 onto plane perpendicular to v2
+	p1 = v1 - np.dot(v1, v2)*v2
+	p2 = v3 - np.dot(v3, v2)*v2
 
+	# Determine torsion angle
+	x = np.dot(p1, p2)
+	y = np.dot(np.cross(v2, p1), p2)
+	
+	return np.degrees(np.arctan2(y, x))
 
 ################################################################################
 # General file reading and editing 
@@ -1879,34 +1890,71 @@ def find_dihedral_atom_ids(pose, resnum, dihedral):
 	bb_atomids = []
 	## Phi angle
 	if dihedral == 'phi':
-        for atom in ['C']:
-            bb_atomids.append(find_atom_id(pose, resnum - 1, atom))
-        for atom in ['N', 'CA', 'C']:
-            bb_atomids.append(find_atom_id(pose, resnum, atom))
+		for atom in ['C']:
+			bb_atomids.append(find_atom_id(pose, resnum - 1, atom))
+		for atom in ['N', 'CA', 'C']:
+			bb_atomids.append(find_atom_id(pose, resnum, atom))
 
 	## Psi angle
 	if dihedral == 'psi':
-        for atom in ['N', 'CA', 'C']:
-            bb_atomids.append(find_atom_id(pose, resnum, atom))
-        for atom in ['N']:
-            bb_atomids.append(find_atom_id(pose, resnum + 1, atom))
+		for atom in ['N', 'CA', 'C']:
+			bb_atomids.append(find_atom_id(pose, resnum, atom))
+		for atom in ['N']:
+			bb_atomids.append(find_atom_id(pose, resnum + 1, atom))
 
 	## Omega angle
 	if dihedral == 'omega':
-        for atom in ['CA', 'C']:
-            bb_atomids.append(find_atom_id(pose, resnum, atom))
-        for atom in ['N', 'CA']:
-            bb_atomids.append(find_atom_id(pose, resnum + 1, atom))
+		for atom in ['CA', 'C']:
+			bb_atomids.append(find_atom_id(pose, resnum, atom))
+		for atom in ['N', 'CA']:
+			bb_atomids.append(find_atom_id(pose, resnum + 1, atom))
 
-    return bb_atomids
+	return bb_atomids
 
 
 def find_atom_coords(pose, resnum, atom_type='CA'):
 	""" 
 	For a given pose and residue number, returns the coordinates of a 
-	specified atom type 
+	specified atom type as an array
 	"""
-	return pose.residue(resnum).atom(atom_type).xyz()
+	import numpy as np
+	return np.array(pose.residue(resnum).atom(atom_type).xyz())
+
+
+def find_dihedral_atom_coords(pose, resnum, dihedral):
+	"""
+	For a given pose, residue number, and dehedral, returns a list of four 
+	xyz coordinate lists corresponding to the atoms comprising that dihedral.
+
+	Options are phi, psi, and omega
+	"""
+	# Confirm acceptable angle selection
+	assert dihedral in ['phi', 'psi', 'omega']
+
+	# Populate list of relevant backbone atoms near dihedral
+	bb_atomids = []
+	## Phi angle
+	if dihedral == 'phi':
+		for atom in ['C']:
+			bb_atomids.append(find_atom_coords(pose, resnum - 1, atom))
+		for atom in ['N', 'CA', 'C']:
+			bb_atomids.append(find_atom_coords(pose, resnum, atom))
+
+	## Psi angle
+	if dihedral == 'psi':
+		for atom in ['N', 'CA', 'C']:
+			bb_atomids.append(find_atom_coords(pose, resnum, atom))
+		for atom in ['N']:
+			bb_atomids.append(find_atom_coords(pose, resnum + 1, atom))
+
+	## Omega angle
+	if dihedral == 'omega':
+		for atom in ['CA', 'C']:
+			bb_atomids.append(find_atom_coords(pose, resnum, atom))
+		for atom in ['N', 'CA']:
+			bb_atomids.append(find_atom_coords(pose, resnum + 1, atom))
+
+	return bb_atomids
 
 
 def list_pose_coords(pose, atom_type='CA'):
@@ -3178,9 +3226,9 @@ def apply_distance_constraints(pose, residue_1, atom_1, residue_2, atom_2,
 	Adds specified distance constraints to a pose. Uses a harmonic constraint 
 	function with a specifiable standard deviation. Input a pose and two residue 
 	numbers with the correspondig atoms for each residue. If distance is set to 
-	0, will use the current distance.
+	0, 'current', or 'c', will use the current distance.
 
-	The pose is modified and the function has an empty return.
+	The function returns the constrained pose.
 
 	Example:
 	apply_distance_constraints(pose, 10, 'CA', 20, 'CA', 5, 0.5)
@@ -3193,7 +3241,7 @@ def apply_distance_constraints(pose, residue_1, atom_1, residue_2, atom_2,
 	a2 = find_atom_id(pose, residue_2, atom_type=atom_2)
 
 	# Adjust distance if current distance is desired
-	if distance == 0:
+	if str(distance).lower() in ['0', 'c', 'current']:
 		distance = calc_distance(a1, a2)
 
 	# Create harmonic score function with specified distance and sd
@@ -3208,18 +3256,109 @@ def apply_distance_constraints(pose, residue_1, atom_1, residue_2, atom_2,
 	return pose
 
 
-def apply_dihedral_constraint(pose, residue, dihedral, angle, sd=5):
+def apply_angle_constraint(pose, residue_1, atom_1, residue_2, atom_2, 
+	residue_3, atom_3, angle, sd=5):
+	"""
+	This function allows for the addition of an angle constraint to a pose. 
+	Uses a circular harmonic constraint function with a specifiable 
+	standard deviation (default 5). 
+
+	Specify the pose and three residue-atom pairs within the pose 
+	(pose numbering, not PDB), and the desired angle (in degrees, not radians). 
+	Setting angle to 'current' or 'c' will use the existing angle.
+	If a looser or tighter constraint is desired, alter the sd of the 
+	harmonic function. 
+
+	The function returns the constrained pose.
+	"""
+	from math import radians
+	from pyrosetta.rosetta.core.scoring.constraints import DihedralConstraint
+	from pyrosetta.rosetta.core.scoring.func import AngleConstraint
+
+	# Determine angle if using current
+	if angle.lower() in ['c', 'current']:
+		atom_coords = []
+		atom_coords.append(find_atom_coords(pose, residue_1, atom_1))
+		atom_coords.append(find_atom_coords(pose, residue_2, atom_2))
+		atom_coords.append(find_atom_coords(pose, residue_3, atom_3))
+		angle = calc_angle(*atom_coords)
+
+	# Create circular harmonic score function with specified angle and sd
+	circ_harm_func = CircularHarmonicFunc(radians(angle), radians(sd))
+
+	# Determine appropriate atom IDs
+	angle_atom_ids = []
+	angle_atom_ids.append(find_atom_id(pose, residue_1, atom_1))
+	angle_atom_ids.append(find_atom_id(pose, residue_2, atom_2))
+	angle_atom_ids.append(find_atom_id(pose, residue_3, atom_3))
+
+	# Create the constraint
+	angle_constraint = AngleConstraint(*angle_atom_ids, circ_harm_func)
+
+	# Add the constraint to the pose
+	pose.add_constraint(angle_constraint)
+
+	return pose
+
+
+def apply_dihedral_constraint(pose, residue_1, atom_1, residue_2, atom_2,
+	residue_3, atom_3, residue_4, atom_4, angle, sd=5):
 	"""
 	This function allows for the addition of a specified dihedral constraint to
 	a pose. Uses a circular harmonic constraint function with a specifiable 
 	standard deviation (default 5). 
+
+	Specify the pose and four residue-atom pairs within the pose (pose 
+	numbering, not PDB) and the desired angle (in degrees, not radians). Setting 
+	the angle to 'current' or 'c' will use the existing angle. If a looser or 
+	tighter constraint is desired, alter the sd of the harmonic function. 
+
+	The function returns the constrained pose.
+	"""
+	from math import radians
+	from pyrosetta.rosetta.core.scoring.constraints import DihedralConstraint
+	from pyrosetta.rosetta.core.scoring.func import CircularHarmonicFunc
+
+	# Determine angle if using current
+	if angle.lower() in ['c', 'current']:
+		atom_coords = []
+		atom_coords.append(find_atom_coords(pose, residue_1, atom_1))
+		atom_coords.append(find_atom_coords(pose, residue_2, atom_2))
+		atom_coords.append(find_atom_coords(pose, residue_3, atom_3))
+		atom_coords.append(find_atom_coords(pose, residue_4, atom_4))
+		angle = calc_dihedral(*atom_coords)
+
+	# Create circular harmonic score function with specified angle and sd
+	circ_harm_func = CircularHarmonicFunc(radians(angle), radians(sd))
+
+	# Determine appropriate atom IDs
+	dihedral_atom_ids = []
+	dihedral_atom_ids.append(find_atom_id(pose, residue_1, atom_1))
+	dihedral_atom_ids.append(find_atom_id(pose, residue_2, atom_2))
+	dihedral_atom_ids.append(find_atom_id(pose, residue_3, atom_3))
+	dihedral_atom_ids.append(find_atom_id(pose, residue_4, atom_4))
+
+	# Create the constraint
+	dihedral_constraint = DihedralConstraint(*dihedral_atom_ids, circ_harm_func)
+
+	# Add the constraint to the pose
+	pose.add_constraint(dihedral_constraint)
+	return pose
+
+
+def apply_bb_constraint(pose, residue, dihedral, angle, sd=5):
+	"""
+	This function allows for the addition of a phi/psi/omega dihedral constraint 
+	to a pose, giving only a residue and dihedral name as inputs. Uses a 
+	circular harmonic constraint function with a specifiable standard deviation 
+	(default 5). 
 
 	Specify the pose, which residue within the pose (pose numbering, not PDB), 
 	which dihedral to set ('phi', 'psi', or 'omega'), and the desired angle (in 
 	degrees, not radians). If a looser or tighter constraint is desired, alter 
 	the sd of the harmonic function. 
 
-	The pose is modified and the function has an empty return.
+	The function returns the constrained pose.
 	"""
 	from math import radians
 	from pyrosetta.rosetta.core.scoring.constraints import DihedralConstraint
@@ -3256,11 +3395,11 @@ def constrain_current_backbone_dihedrals(pose, selection, sd=5):
 	for res in residues_to_constrain:
 		# Phi angle
 		current_phi = pose.phi(res)
-		apply_dihedral_constraint(pose, res, 'phi', current_phi, sd=sd)
+		apply_bb_constraint(pose, res, 'phi', current_phi, sd=sd)
 
 		# Psi angle
 		current_psi = pose.psi(res)
-		apply_dihedral_constraint(pose, res, 'psi', current_psi, sd=sd)
+		apply_bb_constraint(pose, res, 'psi', current_psi, sd=sd)
 
 	return pose
 
