@@ -1,4 +1,7 @@
 #!/usr/bin/python
+"""
+python condense_fasc.py ${decoys_dir} -od ${decoys_dir}/best -n 1 -m 1
+"""
 import argparse
 from glob import glob
 import json
