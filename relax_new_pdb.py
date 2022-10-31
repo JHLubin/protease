@@ -55,7 +55,7 @@ def main(args):
 	if args.name_suffix:
 		out_name = ut.output_file_name(out_name, suffix=args.name_suffix)
 
-	# Loading pose and applying constraints, symmetry, 
+	# Loading pose and applying constraints, symmetry 
 	coord_cst = True
 	if args.no_constraints:
 		coord_cst = False
