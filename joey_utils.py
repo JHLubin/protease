@@ -3,8 +3,6 @@
 
 def str2bool(v):
 	""" Converts a number of potential string inputs to boolean """
-	import argparse 
-
 	if isinstance(v, bool):
 		return v
 	if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -12,20 +10,32 @@ def str2bool(v):
 	elif v.lower() in ('no', 'false', 'f', 'n', '0'):
 		return False
 	else:
-		raise argparse.ArgumentTypeError('Boolean value expected.')
+		raise ValueError('Boolean value expected.')
 
 
 def str2int(v):
+	""" 
+	Attempts to convert an input to an integer, returning the original input if
+	conversion is not feasible
+	"""
+	import warnings
 	try: 
 		return int(v)
 	except:
+		warnings.warn("Could not convert to an int:\n{}".format(v))
 		return v
 
 
 def str2float(v):
+	""" 
+	Attempts to convert an input to a float, returning the original input if
+	conversion is not feasible
+	"""
+	import warnings
 	try: 
 		return float(v)
 	except:
+		warnings.warn("Could not convert to a float:\n{}".format(v))
 		return v
 
 
@@ -316,6 +326,42 @@ def join_list(item_list, joiner=''):
 	does not need to be converted to strings first.
 	"""
 	return joiner.join([str(i) for i in item_list])
+
+
+def clean_list(in_list, to_type=None, nonredundant=True, sort=True):
+	"""
+	Given an input list, returns a cleaned list. 
+
+	- If given a type (str, int, float), will attempt to make all 
+		elements into that type, leaving un-convertable elements unchanged
+	- Removes redundancies (true by default)
+	- Sorts (true by default)
+	"""
+	# Catch improper inputs for object type
+	if to_type not in [None, str, int, float]:
+		err_text = 'to_type must be str, int, float'
+		raise ValueError(err_text)
+
+	# Create modified list
+	out_list = in_list[:]
+
+	# Cast type
+	if to_type == str:
+		out_list = [str(i) for i in out_list]
+	if to_type == int:
+		out_list = [str2int(i) for i in out_list]
+	if to_type == float:
+		out_list = [str2float(i) for i in out_list]
+
+	# Remove redundancies from list
+	if nonredundant:
+		out_list = list(set(out_list))
+
+	# Sort list
+	if sort:
+		out_list = sorted(out_list)
+
+	return out_list
 
 
 def partition_list(in_list, partitions, member):
@@ -803,12 +849,12 @@ def output_file_name(filename, path='', extension='',
 	"""
 	Given a filename, can add prefix, suffix, and/or path to the filename.
 	If the input file includes a path, that path will be retained by default 
-	(an empty string) unless a but can be set to a value or changed to None. The
-	same is true of the file extension. Detection of file extension locates the 
-	last period (.), so that is where suffixes will be added, though .gz 
-	extensions will be stripped off by default. Prefixes and suffixes will be 
-	appended with underscores (_). If mkdir is True and the path does not exist, 
-	it will be created, assuming that there is a path.
+	(an empty string) but can be set to a value or changed to None. The same
+	is true of the file extension. Detection of file extension locates the last
+	period (.), so that is where suffixes will be added, though .gz extensions
+	will be stripped off by default. Prefixes and suffixes will be appended 
+	with underscores (_). If mkdir is True and the path does not exist, it 
+	will be created, assuming that there is a path.
 	"""
 	from os.path import basename, dirname, join, splitext
 
