@@ -13,7 +13,7 @@ def str2bool(v):
 		raise ValueError('Boolean value expected.')
 
 
-def str2int(v):
+def str2int(v, warn=True):
 	""" 
 	Attempts to convert an input to an integer, returning the original input if
 	conversion is not feasible
@@ -22,11 +22,12 @@ def str2int(v):
 	try: 
 		return int(v)
 	except:
-		warnings.warn("Could not convert to an int:\n{}".format(v))
+		if warn:
+			warnings.warn("Could not convert to an int:\n{}".format(v))
 		return v
 
 
-def str2float(v):
+def str2float(v, warn=True):
 	""" 
 	Attempts to convert an input to a float, returning the original input if
 	conversion is not feasible
@@ -35,7 +36,8 @@ def str2float(v):
 	try: 
 		return float(v)
 	except:
-		warnings.warn("Could not convert to a float:\n{}".format(v))
+		if warn:
+			warnings.warn("Could not convert to a float:\n{}".format(v))
 		return v
 
 
@@ -1661,8 +1663,9 @@ def tabulate_pdb_energy_lines(pdb):
 
 	# Populate the table converting line strings to series of floats
 	for eline in energy_lines:
-		line_energies = [str2float(i) for i in eline.strip().split()]
-		line_energies = pd. Series(line_energies, index=headers)
+		line_energies = [str2float(i, warn=False) 
+			for i in eline.strip().split()]
+		line_energies = pd.Series(line_energies, index=headers)
 		energy_table = energy_table.append(line_energies, ignore_index=True)
     
 	# Create residue site and name columns from label
@@ -2921,9 +2924,9 @@ def selector_to_list(pose, selector, pose_numbering=True):
 	if sel_res_str == '':
 		return []
 	else:
-		selected_residues_list = [str2int(i) for i in sel_res_str.split(',')]
+		selected_residues_list = sel_res_str.split(',')
 		if pose_numbering:
-			return selected_residues_list
+			return [str2int(i) for i in selected_residues_list]
 		else:
 			return [split_string_at_numbers(i) for i in selected_residues_list]
 
