@@ -2554,8 +2554,9 @@ def index_selector(indices):
 	"""
 	Creates an index selector for a given selection. If a string is given, 
 	uses that string directly in the selector. Converts integers to strings for 
-	selector input.	Converts ranges or lists of integers to comma-separated 
-	strings for selector input.
+	selector input.	Otherwise, input is assumed to be a list-like object (list, 
+	range, dict_keys, series, etc.), and is converted to a comma-separated 
+	string for selector input.
 	"""
 	from pyrosetta.rosetta.core.select.residue_selector import \
 		ResidueIndexSelector
@@ -2563,10 +2564,10 @@ def index_selector(indices):
 	if isinstance(indices, str):
 		return ResidueIndexSelector(indices)
 
-	if isinstance(indices, int):
+	elif isinstance(indices, int):
 		return ResidueIndexSelector(str(indices))
 
-	if type(indices) in [list, range]:
+	else:
 		ind_str = join_list(indices, ',')
 		return ResidueIndexSelector(ind_str)
 
