@@ -1785,6 +1785,14 @@ def load_pose(pdb, path=None, enzdes_cst=None, coord_cst=False, res_type_cst=0,
 
 	# Load pose
 	pose = pose_from_file(pdb_name)
+	
+	# Applying symmetry
+	if symmetry: 
+		pose = apply_symmetry(pose, symmetry)
+			
+	# Set up membrane
+	if membrane:
+		pose = apply_membrane(pose, membrane, symmetric=symmetry)
 
 	# Applying enzdes constraints
 	if enzdes_cst:
@@ -1797,14 +1805,6 @@ def load_pose(pdb, path=None, enzdes_cst=None, coord_cst=False, res_type_cst=0,
 	# Applying residue type constraints
 	if res_type_cst:
 		pose = apply_res_type_constraints(pose, penalty=res_type_cst)
-	
-	# Applying symmetry
-	if symmetry: 
-		pose = apply_symmetry(pose, symmetry)
-			
-	# Set up membrane
-	if membrane:
-		pose = apply_membrane(pose, membrane, symmetric=symmetry)
 	
 	return pose
 
