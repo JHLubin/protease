@@ -63,8 +63,7 @@ def main(args):
 		coord_cst=coord_cst, symmetry=args.symmetry, membrane=None)
 
 	# Setting up the scorefunction with the desired constraint weights
-	sf = ut.get_sf(rep_type='hard', symmetry=args.symmetry, membrane=0, 
-		constrain=args.constraint_weight)
+	sf = ut.get_sf(symmetry=args.symmetry, constrain=args.constraint_weight)
 
 	# Packer tasks with -ex1 and -ex2
 	tf = ut.make_task_factory()

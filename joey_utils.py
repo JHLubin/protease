@@ -41,22 +41,27 @@ def str2float(v, warn=True):
 		return v
 
 
-def wrap_string(string, width=60):
+def wrap_string(string, width=60, display=True):
 	"""
 	Prints out a string as a set of lines with predefined width
 	"""
 	# Determine line breaks
 	breaks = range(0,len(string), width)
 
-	# Display lines
+	lines = []
+	# Collect lines
 	for n, i in enumerate(breaks[:-1]):
-		print(string[i:breaks[n+1]])
+		lines.append(string[i:breaks[n+1]])
 
 	# Edge case to display the last line
 	if len(string) not in breaks:
-		print(string[breaks[-1]:])
+		lines.append(string[breaks[-1]:])
 
-	return
+	if display:
+		for l in lines:
+			print(l)
+
+	return lines
 
 
 def find_index(query, match): 
@@ -973,6 +978,22 @@ def split_alignment_string(alignment_string, check_len=True):
 	return alignment_list
 
 
+def calculate_alignment_length(alignment):
+	"""
+	Determines the length of alignment between two sequences, based on a 
+	biopython sequence alignment. 
+	"""
+	# Formatting alignment to create a demarcation string
+	alignment_string = generate_formatted_aligment(alignment)
+
+	# Split alignment string into sections representing different sequences
+	# The demarcation string is the second element of the list
+	a_list = split_alignment_string(alignment_string)
+
+	# Determine length, excluding unaligned gaps
+	return len([i for i in a_list[1] if i != ' '])
+
+
 def display_alignment(alignment, width=80):
 	"""
 	Input a biopython alignment to print out a formatted alignment display.
@@ -1023,6 +1044,8 @@ def display_alignment(alignment, width=80):
 	for i in a_list[3:]:
 		print(i)
 
+	print('LAli: {}'.format(len([i for i in a_list[1] if i != ' '])))
+
 	return
 
 
@@ -1072,9 +1095,9 @@ def tabulate_sequence_alignment(alignment):
 		'identity': identities})
 
 	# Add column to check whether residues are aligned 
-	align_df['aligned'] = align_df.apply(lambda row: int(
-		isinstance(row['s1_position'], int) and 
-		isinstance(row['s2_position'], int)), axis='columns')
+	align_df['aligned'] = align_df.apply(lambda row: int(not
+		(np.isnan(row['s1_position']) or np.isnan(row['s2_position']))), 
+		axis='columns')
 
 	return align_df
 
@@ -1818,6 +1841,39 @@ def pose_copy(pose):
 
 	return copied_pose
 
+
+def append_pose(pose_1, pose_2, new_chain=True):
+	"""
+	Appends one pose to another. By default, appends new pose after a jump.
+	pose_1 will precede pose_2
+	"""
+	from pyrosetta.rosetta.core.pose import append_pose_to_pose
+
+	# Create new pose, starting from pose_1
+	combined_pose = pose_copy(pose_1)
+
+	# Add second pose
+	append_pose_to_pose(pose1=combined_pose, pose2=pose_2, new_chain=new_chain)
+
+	# Check chain renumbering
+	#switch_chains = pyrosetta.rosetta.protocols.simple_moves.SwitchChainOrderMover()
+	#switch_chains.chain_order("12")
+	#switch_chains.apply(pose)
+
+	return combined_pose
+
+
+def set_pose_name(pose, pose_name):
+	"""
+	Set the name of a pose in the PDB info to an input string. Necessary for 
+	outputting multiple poses as silent files. Names are by default the full
+	PDB name, including path, for poses loaded from files, or the first 8 
+	letters of the sequence for poses created from sequences.
+	"""
+	pose.pdb_info().name(pose_name)
+
+	return pose
+
 ################################################################################
 # Pose informatics functions (functions require PyRosetta)
 
@@ -2178,18 +2234,6 @@ def find_sequence_in_pose_table(pose_table, sequence, instances=0):
 		selected_rows = collectable_indices[instances - 1]
 
 	return pose_table.iloc[selected_rows]
-
-
-def set_pose_name(pose, pose_name):
-	"""
-	Set the name of a pose in the PDB info to an input string. Necessary for 
-	outputting multiple poses as silent files. Names are by default the full
-	PDB name, including path, for poses loaded from files, or the first 8 
-	letters of the sequence for poses created from sequences.
-	"""
-	pose.pdb_info().name(pose_name)
-
-	return pose
 
 ################################################################################
 # Pose geometric evaluation functions (functions require PyRosetta)
@@ -2953,20 +2997,26 @@ def selector_to_pymol(pose, selector, selection_name):
 ################################################################################
 # Scoring functions (functions require PyRosetta)
 
-def get_sf(rep_type='hard', symmetry=False, membrane=0, constrain=1.0, 
-	hbnet=0):
+def get_sf(score_type='hard', symmetry=False, constrain=1.0, 
+	hbnet=0.0, voids=0.0, bunsat=0.0):
 	"""
-	Determines the appropriate score function to use, based on a rep_type
-	that is either hard (ref2015) or soft (ref2015_soft), whether symmetry 
-	and/or membrane modeling are in use, and whether constraints are desired.
-	If setting membrane and/or hbnet, change value to desired nonzero weight.
+	Determines the appropriate score function to use, based on a score_type
+	that is either hard (ref2015), soft (ref2015_soft), cartesian (cart, 
+	ref2015_cart), membrane (memb, franklin2019), accounting for whether 
+	symmetry is in use, and whether constraints are desired.
+	
+	If using membrane with soft repulsion, give a nonzero fa_water_to_bilayer
+	If setting hbnet, voids, and/or bunsat, change value to desired nonzero weight. 
 	"""
 	from pyrosetta import create_score_function, ScoreFunction
 	from pyrosetta.rosetta.core.scoring import ScoreType
 	from pyrosetta.rosetta.core.scoring.symmetry import SymmetricScoreFunction
 
-	score_types = {'hard': 'ref2015', 'soft': 'ref2015_soft'}
-	assert rep_type in score_types
+	score_types = {	'hard': 'ref2015', 'soft': 'ref2015_soft', 
+		'cart': 'ref2015_cart', 'memb': 'franklin2019'}
+	if score_type not in score_types:
+		raise ValueError('Score type options are: {}'.format(
+			join_list(score_types.keys())))
 
 	# Create base empty score function symmetrically or asymmetrically
 	if symmetry: # Declare symmetric score functions
@@ -2975,16 +3025,7 @@ def get_sf(rep_type='hard', symmetry=False, membrane=0, constrain=1.0,
 		score_function = ScoreFunction()
 
 	# Add main score weights
-	if rep_type == 'hard':
-		score_function.add_weights_from_file('ref2015')
-	elif rep_type == 'soft':
-		score_function.add_weights_from_file('ref2015_soft')
-		if membrane: # Set up a soft-rep version of franklin2019 manually
-			score_function.set_weight(ScoreType.fa_water_to_bilayer, membrane)
-
-	# Add membrane weights if appliccable
-	if membrane:
-		score_function.add_weights_from_file('franklin2019')
+	score_function.add_weights_from_file(score_types[score_type])
 
 	# The score functions do not have constraint weights incorporated in 
 	# themselves. If requisite, the constraint weights are added.
@@ -3000,6 +3041,12 @@ def get_sf(rep_type='hard', symmetry=False, membrane=0, constrain=1.0,
 	# Optionally adding in hbnet
 	if hbnet:
 		score_function.set_weight(ScoreType.hbnet, hbnet)
+
+	if voids:
+		score_function.set_weight(ScoreType.voids_penalty, voids)
+
+	if bunsat:
+		score_function.set_weight(ScoreType.buried_unsatisfied_penalty, bunsat)
 	
 	return score_function
 
@@ -3242,6 +3289,8 @@ def apply_coord_constraints(pose, selection=None, sidechains=False,
 
 	if selection:
 		cg.set_residue_selector(selection)
+	else:
+		cg.set_residue_selector(full_selector())
 
 	if bounded:
 		cg.set_bounded(True)	
